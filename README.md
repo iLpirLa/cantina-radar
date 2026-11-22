@@ -61,13 +61,13 @@ TELEGRAM_CHAT_ID=6513444198
 ```
 **Lascia aperta la finestra nera**: finché è aperta funzionano la dashboard, il pulsante e il bot.
 
-### 5. Installa il pulsante (una volta sola)
+### 5. Installa il pulsante (una volta sola, e dopo ogni aggiornamento)
 Al primo avvio si apre la pagina `http://localhost:8000/installa.html`. Trascina il pulsante rosso **🍷 Cantina Radar** nella barra dei preferiti del browser. La pagina spiega anche come mostrare la barra se non la vedi.
 
 ### 6. Usalo
 1. Su catawiki.com apri le aste di vino. Il modo migliore è la categoria **Vino** con il filtro *"Chiude oggi"*.
 2. Premi **🍷 Cantina Radar** nei preferiti.
-3. Si apre una finestra che legge la pagina corrente e le 3 successive (circa 100 lotti; cambia il numero con `browser.pagine` in `config.yaml`) e ti porta alla dashboard. Le occasioni sopra soglia ti arrivano anche su Telegram.
+3. In basso a destra compare un pannello che legge la pagina corrente e le 3 successive (circa 100 lotti; cambia il numero con `browser.pagine` in `config.yaml`). Poi si apre Cantina Radar con i risultati. Se il browser blocca la finestra, premi **Apri i risultati →** nel pannello. Le occasioni sopra soglia ti arrivano anche su Telegram.
 4. Ripeti quando vuoi aggiornare le offerte, per esempio nell'ultima ora prima della chiusura. Ogni pressione registra anche i **prezzi finali** delle aste già chiuse che avevi visto: così lo storico si arricchisce da solo.
 
 La dashboard si apre anche dal telefono, sulla stessa Wi-Fi: lo script mostra l'indirizzo `http://192.168.x.x:8000/`.

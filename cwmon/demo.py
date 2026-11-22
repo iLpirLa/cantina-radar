@@ -75,6 +75,11 @@ def run_demo(cfg: dict) -> Path:
     insert("Domaine Vincent Paris ; Domaine Paul Jaboulet Ainé - Rhône - 4 Bottles (0.75L)", 60, now + 5400, 0, None,
            est=(90, 120))
     insert("2001 Fattoria Sconosciuta, Riserva Speciale - Chianti Classico - 1 Bottle (0.75L)", 22, now + 9000, 0, None)
+    # punteggi Vivino d'esempio (inventati) per vedere come appaiono
+    for r in db.conn.execute("SELECT DISTINCT wine_key, vintage FROM lots WHERE final=0 AND parse_ok=1").fetchall():
+        db.conn.execute("INSERT OR REPLACE INTO vivino(wine_key, vintage, name, year, rating, rating_count, url, fetched_at) "
+                        "VALUES(?,?,?,?,?,?,?,?)", (r[0], r[1], "demo", r[1], round(rnd.uniform(3.7, 4.7), 1),
+                                                    rnd.randint(80, 9000), "https://www.vivino.com", now))
     db.commit()
 
     from .dashboard import build

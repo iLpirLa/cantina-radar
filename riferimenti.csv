@@ -1,6 +1,7 @@
-vino,annata,prezzo_bottiglia,fonte,note
-Château Lynch Bages Pauillac,2008,135,esempio,Sostituisci con i tuoi prezzi (Wine-Searcher / Vivino / enoteca)
-Château Pontet-Canet Pauillac,2016,160,esempio,
-Tenuta San Guido Sassicaia Bolgheri,2015,330,esempio,
-Prunotto Bussia Vigna Colonnello Barolo Riserva,2016,110,esempio,
-Bollinger Special Cuvée Champagne,,55,esempio,annata vuota = vale per qualunque annata (o NV)
+vino,annata,prezzo_bottiglia,fonte,punteggio,note
+Château Lynch Bages Pauillac,2008,135,esempio,,Sostituisci con i tuoi prezzi (Wine-Searcher / Vivino / enoteca)
+Château Pontet-Canet Pauillac,2016,160,esempio,,
+Tenuta San Guido Sassicaia Bolgheri,2015,330,esempio,,
+Prunotto Bussia Vigna Colonnello Barolo Riserva,2016,110,esempio,,
+Bollinger Special Cuvée Champagne,,55,esempio,,annata vuota = vale per qualunque annata (o NV)
+Fattoria Sconosciuta Riserva Speciale Chianti Classico,2001,60,dashboard,,lotto 900000085

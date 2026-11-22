@@ -69,8 +69,9 @@ def collect(cfg: dict, db: DB, client: CatawikiClient) -> dict:
 # ---------------------------------------------------------------- valutazione
 def score_all(cfg: dict, db: DB) -> Valuator:
     refs = load_references(Path(cfg["_root"]) / cfg["valutazione"]["file_riferimenti"])
+    vivino = {(r["wine_key"], r["vintage"]): dict(r) for r in db.conn.execute("SELECT * FROM vivino")}
     val = Valuator(refs, db.history(int(cfg["valutazione"]["giorni_storico"])), cfg["costi"],
-                   float(cfg["valutazione"]["match_minimo"]))
+                   float(cfg["valutazione"]["match_minimo"]), vivino)
     target = float(effective_alert_cfg(cfg, db)["sconto_minimo"])
     for lot in db.open_lots():
         s = val.score(lot, target)
@@ -92,6 +93,8 @@ def candidates(cfg: dict, db: DB, within_hours: float | None = None) -> list:
         if r["discount"] < float(a["sconto_minimo"]) or r["confidence"] < float(a["affidabilita_minima"]):
             continue
         if a["budget_massimo"] and (r["current_bid"] or 0) > float(a["budget_massimo"]):
+            continue
+        if float(a.get("punteggio_minimo") or 0) > 0 and (r["rating"] or 0) < float(a["punteggio_minimo"]):
             continue
         if a["escludi_riserva_non_raggiunta"] and r["reserve_set"] and r["reserve_met"] == 0:
             continue

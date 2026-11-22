@@ -31,12 +31,27 @@ def build(cfg: dict, db: DB, out_dir: str | Path | None = None) -> Path:
             "elo": r["estimate_low"], "ehi": r["estimate_high"],
             "mv": r["market_per_bottle"], "cpb": r["cost_per_bottle"], "d": r["discount"],
             "c": r["confidence"], "src": r["value_source"], "mb": r["max_bid"],
+            "pr": r["producer"], "cu": r["cuvee"], "ap": r["appellation"], "ok": r["parse_ok"],
+            "rt": r["rating"], "rc": r["rating_count"], "ru": r["rating_url"], "cs": r["critic_score"],
+        })
+    history = []
+    fee, fix = cfg["costi"]["commissione_pct"], cfg["costi"]["commissione_fissa"]
+    for r in db.sold_history():
+        history.append({
+            "id": r["id"], "t": r["title"], "u": lot_url(r["id"], r["slug"], loc) if r["id"] > 0 else None,
+            "end": r["end_time"], "bid": r["current_bid"], "eq": r["bottle_eq"], "v": r["vintage"],
+            "ppb": round((r["current_bid"] * (1 + fee) + fix) / r["bottle_eq"], 2) if r["bottle_eq"] else None,
+            "cat": CATEGORIES.get(r["category_id"], ""),
         })
     payload = {
         "generated": int(time.time()), "stats": db.stats(), "last_run": db.get("last_run", {}),
         "settings": {"sconto_minimo": a["sconto_minimo"], "affidabilita_minima": a["affidabilita_minima"],
-                     "ore_alla_chiusura": a["ore_alla_chiusura"]},
+                     "ore_alla_chiusura": a["ore_alla_chiusura"], "punteggio_minimo": a.get("punteggio_minimo") or 0,
+                     "budget_massimo": a.get("budget_massimo") or 0, "pausa": bool(a.get("pausa"))},
+        "costs": cfg["costi"],
         "lots": lots,
+        "history": history,
+        "vivino_blocked": bool(db.get("vivino_bloccato")),
     }
     data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     html = TEMPLATE.read_text(encoding="utf-8").replace("/*__DATA__*/null", data)

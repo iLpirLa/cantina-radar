@@ -20,10 +20,11 @@ DEFAULTS = {
     "avvisi": {
         "sconto_minimo": 0.25, "ore_alla_chiusura": 3, "affidabilita_minima": 0.5,
         "budget_massimo": 0, "escludi_riserva_non_raggiunta": True,
-        "ultima_chiamata_minuti": 45, "includi": [], "escludi": [],
+        "ultima_chiamata_minuti": 45, "includi": [], "escludi": [], "punteggio_minimo": 0,
     },
     "dashboard": {"cartella": "site", "ore_max": 48},
     "browser": {"pagine": 4},
+    "vivino": {"attivo": True, "pausa": 2.0},
 }
 
 

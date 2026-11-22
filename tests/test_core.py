@@ -163,7 +163,7 @@ def test_alert_flow(tmp_path):
     monitor.score_all(cfg, db)  # riferimento d'esempio Sassicaia 2015 = 330 €
     tg = FakeTG()
     assert monitor.send_alerts(cfg, db, tg) == 1
-    assert "Sassicaia" in tg.sent[0] and "Offerta massima" in tg.sent[0]
+    assert "Sassicaia" in tg.sent[0] and "Offri al massimo" in tg.sent[0]
     assert monitor.send_alerts(cfg, db, tg) == 0  # nessun duplicato
     # comandi: solo la chat autorizzata viene ascoltata
     monitor.handle_commands(cfg, db, tg)
@@ -215,6 +215,7 @@ def test_collect_end_to_end(tmp_path, monkeypatch):
 def test_ingest_from_browser(tmp_path):
     from cwmon.server import ingest, pending_ids, _fallback_from_text
     cfg = load_config()
+    cfg["_no_background"] = True
     cfg["db_path"] = str(tmp_path / "b.db")
     cfg["dashboard"]["cartella"] = str(tmp_path / "site")
     db = DB(cfg["db_path"])
@@ -262,3 +263,48 @@ def test_clean_title_and_classify():
     assert classify("qualsiasi", 443, False) == 443
     p = parse_title("2022 Catena Zapata Malbec Argentino - Mendoza - 3 Bottiglie (0,75 L)")
     assert p.bottles == 3 and p.bottle_eq == 3 and p.vintage == 2022 and p.ok
+
+
+def test_settings_reference_and_csv(tmp_path):
+    from cwmon.server import update_settings, add_reference, import_history_csv
+    import shutil
+    root = tmp_path / "proj"
+    root.mkdir()
+    shutil.copy(Path(__file__).parent.parent / "config.yaml", root / "config.yaml")
+    (root / "riferimenti.csv").write_text("vino,annata,prezzo_bottiglia,fonte,punteggio,note\n", encoding="utf-8")
+    cfg = load_config(root / "config.yaml")
+    cfg["db_path"] = str(root / "data" / "t.db")
+    db = DB(cfg["db_path"])
+    title = "2016 Bruno Giacosa, Falletto - Barolo - 1 Bottle (0.75L)"
+    p = parse_title(title)
+    db.upsert_listing({"id": 7, "title": title, "slug": "x", "category_id": 443, "image_url": None, "producer": p.producer,
+                       "cuvee": p.cuvee, "appellation": p.appellation, "vintage": 2016, "nv": 0, "mixed": 0, "bottles": 1,
+                       "bottle_eq": 1.0, "size_l": 0.75, "wine_name": p.wine_name, "wine_key": p.wine_key, "parse_ok": 1})
+    db.update_live(7, {"current_bid": 90, "end_time": int(time.time()) + 3600, "final": 0})
+    db.commit()
+    s = update_settings(cfg, db, {"sconto_minimo": 0.3, "punteggio_minimo": 4.2, "budget_massimo": 500})
+    assert s["sconto_minimo"] == 0.3 and s["punteggio_minimo"] == 4.2
+    r = add_reference(cfg, db, {"lot_id": 7, "prezzo": "200", "punteggio": "JS 97"})
+    assert r["sconto"] > 0.3
+    lot = db.conn.execute("SELECT * FROM lots WHERE id=7").fetchone()
+    assert lot["market_per_bottle"] == 200 and lot["critic_score"] == "JS 97"
+    assert "Giacosa" in (root / "riferimenti.csv").read_text(encoding="utf-8")
+    res = import_history_csv(cfg, db, "titolo;prezzo_finale;data\n" + title + ";150;01/11/2026\nriga senza prezzo;;\n")
+    assert res == {"importati": 1, "scartati": 1}
+    assert len(db.sold_history()) == 1
+
+
+def test_vivino_parse_and_match():
+    from cwmon.vivino import parse_search_html, best_match
+    html = """<div class="card"><div class="wine-card__content">
+      <span class="wine-card__name"><a href="/tenuta-san-guido-sassicaia/w/1093?year=2015"><span class="bold">Tenuta San Guido Sassicaia 2015</span></a></span>
+      <div class="wine-card__region">Bolgheri Sassicaia, Italia</div>
+      <div class="average__number">4,7</div><p class="text-micro">(8.163 valutazioni)</p><span>€ 329,00</span></div></div>
+      <div class="card"><a href="/x/w/55?year=2012">Altro vino 2012</a><div class="average__number">3,9</div><p>(120 ratings)</p></div>"""
+    hits = parse_search_html(html)
+    assert len(hits) == 2
+    h = hits[0]
+    assert h.rating == 4.7 and h.count == 8163 and h.year == 2015 and h.price == 329 and h.currency == "EUR"
+    p = parse_title("2015 Tenuta San Guido, Sassicaia - Bolgheri - 1 Bottle (0.75L)")
+    lot = {"wine_name": p.wine_name, "vintage": 2015, "producer": p.producer, "cuvee": p.cuvee, "appellation": p.appellation}
+    assert best_match(lot, hits).rating == 4.7

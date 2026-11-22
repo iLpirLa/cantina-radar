@@ -11,12 +11,29 @@ Valuta le aste di vino, Champagne e vini dolci che stai guardando su Catawiki e 
 
 ---
 
+## La dashboard
+
+- **Il tuo obiettivo** (in alto): sconto minimo che cerchi, punteggio Vivino minimo, offerta massima e finestra per gli avvisi. Quando premi **Salva obiettivo**, valgono sia per la dashboard sia per Telegram.
+- **🔥 Occasioni**: le aste che rispettano il tuo obiettivo.
+- **Tutti i lotti**: ogni lotto letto, con il giudizio (*Affare*, *Interessante*, *Prezzo di mercato*, *Sopra il mercato*).
+- **Da valutare**: i vini di cui l'app non conosce ancora il valore. Scrivi il prezzo a bottiglia direttamente lì: c'è il link per cercarlo su Wine-Searcher e Vivino. Viene salvato in `riferimenti.csv` e usato anche per le aste future.
+- **Storico vendite**: le aste chiuse registrate, più un riquadro per importare un tuo CSV di vendite passate.
+- **Come funziona**: la spiegazione di ogni voce.
+
+Ogni lotto dice in parole quanto ti costerebbe a bottiglia, quanto vale e **fino a che offerta conviene salire** per restare nel tuo sconto.
+
+## Punteggi dei vini
+
+- **★ Vivino** (automatico): valutazione media degli utenti Vivino, su scala 1–5, con il numero di voti. Dopo ogni pressione del pulsante l'app cerca in background i vini nuovi, al massimo una volta ogni 30 giorni per vino. Se Vivino mostra anche un prezzo in euro per quell'annata, lo usa come fonte di valore secondaria. Vivino non ha un'API ufficiale: l'app usa la sua ricerca pubblica, con poche richieste distanziate, e se Vivino la blocca smette di cercare. Per una prova: `python -m cwmon vivino "Sassicaia 2015"`.
+- **✎ Critica** (manuale): James Suckling, Parker e simili sono a pagamento e non si possono leggere in automatico. Puoi scriverli tu quando inserisci il valore di un vino (campo "es. JS 95") o nella colonna `punteggio` di `riferimenti.csv`.
+
 ## Come stima il valore di mercato
 
 | Fonte | Affidabilità | Come funziona |
 |---|---|---|
 | `riferimenti.csv` | alta (90%) | I prezzi che inserisci tu, per bottiglia (da Wine-Searcher, Vivino, la tua enoteca…) |
 | Storico stessa annata | 45–85% | Prezzi finali delle aste Catawiki chiuse, registrati automaticamente dall'app. Più vendite = più affidabile |
+| Prezzo Vivino | 50% | Prezzo in euro mostrato da Vivino per quell'annata (quando c'è) |
 | Storico altre annate | 35% | Stesso vino, annate diverse: mostrato in dashboard ma sotto la soglia degli avvisi |
 
 Se ci sono più fonti, il valore è una media pesata sull'affidabilità. Quando le fonti concordano l'affidabilità sale, quando divergono scende.
@@ -26,14 +43,15 @@ Se ci sono più fonti, il valore è una media pesata sull'affidabilità. Quando 
 ### Il file `riferimenti.csv`
 
 ```csv
-vino,annata,prezzo_bottiglia,fonte,note
-Tenuta San Guido Sassicaia Bolgheri,2015,330,wine-searcher,
-Bollinger Special Cuvée Champagne,,55,vivino,annata vuota = qualunque annata/NV
+vino,annata,prezzo_bottiglia,fonte,punteggio,note
+Tenuta San Guido Sassicaia Bolgheri,2015,330,wine-searcher,JS 97,
+Bollinger Special Cuvée Champagne,,55,vivino,,annata vuota = qualunque annata/NV
 ```
 
 - **I prezzi già presenti sono solo esempi**: sostituiscili con i tuoi.
 - Il nome viene confrontato in modo "elastico" (accenti, maiuscole, "Château", "Domaine"… non contano). Scrivi produttore + vino + denominazione. Un nome troppo generico come "Barolo" verrebbe abbinato a tutti i Barolo.
 - Il prezzo è **per bottiglia da 0,75 L**, IVA inclusa, spedizione esclusa.
+- Il modo più comodo per aggiungere righe è la scheda **Da valutare** della dashboard.
 
 ---
 
@@ -116,6 +134,7 @@ python -m cwmon demo          # dashboard con dati di esempio in site-demo/index
 python -m cwmon start --lan   # quello che usano gli script: dashboard + pulsante + bot
 python -m cwmon serve         # apre la dashboard su http://localhost:8000
 python -m cwmon bot           # bot con risposte immediate
+python -m cwmon vivino "Sassicaia 2015"   # prova la ricerca del punteggio Vivino
 python -m pytest              # test automatici
 ```
 
@@ -135,7 +154,8 @@ python -m pytest              # test automatici
 ```
 cwmon/
   web/             pulsante per il browser (bookmarklet), pagina di installazione e di importazione
-  server.py        server locale: dashboard e importazione dei lotti
+  server.py        server locale: dashboard, importazione, impostazioni, prezzi e storico
+  vivino.py        punteggio Vivino (ricerca pubblica, con archivio locale)
   catawiki.py      interpretazione dei dati Catawiki (offerte live, elenchi)
   parser.py        interpretazione dei titoli (annata, produttore, formato, n. bottiglie)
   valuation.py     valore di mercato, costo reale, offerta massima

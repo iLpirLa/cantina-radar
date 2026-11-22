@@ -29,6 +29,7 @@ class Reference:
     vintage: int | None
     price: float
     source: str
+    score: str = ""
 
 
 def load_references(path: str | Path) -> list[Reference]:
@@ -52,6 +53,7 @@ def load_references(path: str | Path) -> list[Reference]:
                 vintage=int(v) if v.isdigit() else None,
                 price=price,
                 source=(row.get("fonte") or "manuale").strip(),
+                score=(row.get("punteggio") or "").strip(),
             ))
     return refs
 
@@ -79,8 +81,10 @@ def max_bid_for(target_per_bottle: float, bottle_eq: float, bottles: int, costs:
 
 
 class Valuator:
-    def __init__(self, refs: list[Reference], history_rows, costs: dict, match_min: float = 88):
+    def __init__(self, refs: list[Reference], history_rows, costs: dict, match_min: float = 88,
+                 vivino: dict | None = None):
         self.refs = refs
+        self.vivino = vivino or {}
         self.costs = costs
         self.match_min = match_min
         # storico: per ogni vendita, prezzo pagato per bottiglia (commissione inclusa)
@@ -105,6 +109,25 @@ class Valuator:
                 self._by_token.setdefault(h["name"].split()[0], []).append(h)
 
     # ----------------------------------------------------------------- fonti
+    def match_ref(self, lot) -> Reference | None:
+        best, best_s = None, 0.0
+        for ref in self.refs:
+            if ref.vintage is not None and ref.vintage != lot["vintage"]:
+                continue
+            s = similarity(lot["wine_name"], ref.name_norm)
+            s_adj = s + (2 if ref.vintage is not None else 0)
+            if s >= self.match_min and s_adj > best_s:
+                best, best_s = ref, s_adj
+        return best
+
+    def _from_vivino(self, lot) -> dict | None:
+        v = self.vivino.get((lot["wine_key"], lot["vintage"]))
+        if not v or not v.get("price") or v.get("currency") != "EUR":
+            return None
+        if lot["vintage"] and v.get("year") and v["year"] != lot["vintage"]:
+            return None
+        return {"value": float(v["price"]), "conf": 0.5, "src": "prezzo Vivino", "n": 1}
+
     def _from_refs(self, lot) -> dict | None:
         best, best_s = None, 0.0
         for ref in self.refs:
@@ -172,7 +195,8 @@ class Valuator:
         if not lot["parse_ok"]:
             # lotti misti o non interpretabili: solo stima esperto
             return self._from_estimate(lot)
-        sources = [s for s in (self._from_refs(lot), self._from_history(lot), self._from_estimate(lot)) if s]
+        sources = [s for s in (self._from_refs(lot), self._from_history(lot), self._from_estimate(lot),
+                               self._from_vivino(lot)) if s]
         if not sources:
             other = self._from_history_other(lot)
             return other
@@ -184,10 +208,21 @@ class Valuator:
             conf = min(0.95, conf + 0.05) if spread <= 0.25 else conf * (0.8 if spread > 0.5 else 0.95)
         return {"value": value, "conf": round(conf, 2), "src": " + ".join(s["src"] for s in sources)}
 
+    def quality(self, lot) -> dict:
+        out = {}
+        v = self.vivino.get((lot["wine_key"], lot["vintage"]))
+        if v and v.get("rating"):
+            out.update(rating=v["rating"], rating_count=v.get("rating_count"), rating_url=v.get("url"))
+        ref = self.match_ref(lot) if lot["parse_ok"] else None
+        if ref and ref.score:
+            out["critic_score"] = ref.score
+        return out
+
     def score(self, lot, target_discount: float) -> dict | None:
+        q = self.quality(lot)
         mv = self.market_value(lot)
         if not mv or not lot["bottle_eq"]:
-            return None
+            return q or None
         total, per_bottle = lot_cost(lot["current_bid"] or 0, lot["bottle_eq"], lot["bottles"], self.costs)
         discount = 1 - per_bottle / mv["value"]
         return {
@@ -198,4 +233,5 @@ class Valuator:
             "confidence": mv["conf"],
             "value_source": mv["src"],
             "max_bid": max_bid_for(mv["value"] * (1 - target_discount), lot["bottle_eq"], lot["bottles"], self.costs),
+            **q,
         }

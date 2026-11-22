@@ -58,6 +58,21 @@ CREATE TABLE IF NOT EXISTS alerts (
     PRIMARY KEY (lot_id, kind)
 );
 
+CREATE TABLE IF NOT EXISTS vivino (
+    wine_key     TEXT,
+    vintage      INTEGER,
+    query        TEXT,
+    name         TEXT,
+    year         INTEGER,
+    rating       REAL,
+    rating_count INTEGER,
+    price        REAL,
+    currency     TEXT,
+    url          TEXT,
+    fetched_at   INTEGER
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vivino ON vivino(wine_key, COALESCE(vintage, 0));
+
 CREATE TABLE IF NOT EXISTS kv (
     key   TEXT PRIMARY KEY,
     value TEXT
@@ -76,6 +91,15 @@ class DB:
         self.conn = sqlite3.connect(path, timeout=30, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(lots)")}
+        for name, typ in (("rating", "REAL"), ("rating_count", "INTEGER"), ("rating_url", "TEXT"),
+                          ("critic_score", "TEXT")):
+            if name not in cols:
+                self.conn.execute(f"ALTER TABLE lots ADD COLUMN {name} {typ}")
+        self.conn.commit()
 
     # ---------- kv ----------
     def get(self, key: str, default=None):
@@ -115,9 +139,10 @@ class DB:
     def save_score(self, lot_id: int, s: dict) -> None:
         self.conn.execute(
             "UPDATE lots SET market_per_bottle=?, cost_per_bottle=?, discount=?, confidence=?, value_source=?, "
-            "max_bid=?, scored_at=? WHERE id=?",
+            "max_bid=?, scored_at=?, rating=?, rating_count=?, rating_url=?, critic_score=? WHERE id=?",
             (s.get("market_per_bottle"), s.get("cost_per_bottle"), s.get("discount"), s.get("confidence"),
-             s.get("value_source"), s.get("max_bid"), int(time.time()), lot_id),
+             s.get("value_source"), s.get("max_bid"), int(time.time()), s.get("rating"), s.get("rating_count"),
+             s.get("rating_url"), s.get("critic_score"), lot_id),
         )
 
     def commit(self) -> None:
@@ -145,6 +170,11 @@ class DB:
             "SELECT id, wine_key, wine_name, vintage, nv, bottle_eq, current_bid, end_time FROM lots "
             "WHERE final=1 AND sold=1 AND parse_ok=1 AND current_bid>0 AND bottle_eq>0 AND end_time>=?",
             (since,),
+        ).fetchall()
+
+    def sold_history(self, limit: int = 500) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM lots WHERE final=1 AND sold=1 AND current_bid>0 ORDER BY end_time DESC LIMIT ?", (limit,)
         ).fetchall()
 
     def stats(self) -> dict:

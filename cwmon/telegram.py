@@ -92,6 +92,14 @@ def alert_text(lot, s: dict, kind: str) -> str:
     if lot["end_time"]:
         dt = datetime.fromtimestamp(lot["end_time"], ROME)
         end_local = dt.strftime("%H:%M") if dt.date() == datetime.now(ROME).date() else dt.strftime("%d/%m %H:%M")
+    rating = ""
+    try:
+        if lot["rating"]:
+            rating = f"★ Vivino {lot['rating']:.1f}".replace(".", ",") + (f" ({lot['rating_count']} voti)" if lot["rating_count"] else "") + "\n"
+        if lot["critic_score"]:
+            rating += f"✎ Critica: {html.escape(lot['critic_score'])}\n"
+    except (IndexError, KeyError):
+        pass
     reserve = ""
     if lot["reserve_set"] and lot["reserve_met"] == 0:
         reserve = "\n⚠️ Riserva non ancora raggiunta"
@@ -100,7 +108,8 @@ def alert_text(lot, s: dict, kind: str) -> str:
         f"<b>{html.escape(lot['title'] or '')}</b>\n\n"
         f"Offerta attuale: <b>{fmt_eur(lot['current_bid'])}</b> · chiude tra {time_left(lot['end_time'])} ({end_local})\n"
         f"Costo reale/bott.: {fmt_eur(s['cost_per_bottle'])} vs valore {fmt_eur(s['market_per_bottle'])}\n"
-        f"💡 Offerta massima consigliata: <b>{fmt_eur(s['max_bid'])}</b>\n"
+        f"💡 Offri al massimo <b>{fmt_eur(s['max_bid'])}</b> per restare nel tuo sconto minimo\n"
+        f"{rating}"
         f"Fonte valore: {html.escape(s['value_source'])} · affidabilità {s['confidence'] * 100:.0f}%"
         f"{reserve}"
     )

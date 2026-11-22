@@ -45,6 +45,9 @@ avvisi:
   ore_alla_chiusura: 3
   # Affidabilità minima della valutazione (0-1)
   affidabilita_minima: 0.5
+  # Punteggio Vivino minimo (scala 1-5, es. 4.0). 0 = nessun filtro.
+  # Si può cambiare anche dalla dashboard, nel riquadro "Il tuo obiettivo".
+  punteggio_minimo: 0
   # Budget massimo per lotto (offerta corrente, €). 0 = nessun limite
   budget_massimo: 0
   # Ignora i lotti con prezzo di riserva non ancora raggiunto
@@ -65,3 +68,9 @@ browser:
   # Quante pagine legge il pulsante "Cantina Radar" a ogni pressione (25 lotti per pagina),
   # a partire da quella che stai guardando. Dopo una modifica, reinstalla il pulsante dalla pagina installa.html
   pagine: 4
+
+vivino:
+  # Cerca automaticamente il punteggio Vivino dei vini (una volta ogni 30 giorni per vino)
+  attivo: true
+  # Pausa tra le ricerche, in secondi
+  pausa: 2.0

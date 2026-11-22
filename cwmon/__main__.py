@@ -7,6 +7,7 @@
     python -m cwmon doctor         verifica che la lettura di Catawiki funzioni e salva campioni in debug/
     python -m cwmon demo           dati di esempio per provare dashboard e scoring senza rete
     python -m cwmon test-telegram  invia un messaggio di prova
+    python -m cwmon vivino "Sassicaia 2015"   prova la ricerca del punteggio Vivino
 """
 from __future__ import annotations
 
@@ -22,7 +23,8 @@ from .config import load_config
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="cwmon", description="Catawiki Wine Monitor")
-    ap.add_argument("command", choices=["start", "run", "loop", "serve", "bot", "doctor", "demo", "test-telegram"])
+    ap.add_argument("command", choices=["start", "run", "loop", "serve", "bot", "doctor", "demo", "test-telegram", "vivino"])
+    ap.add_argument("query", nargs="?", default="Tenuta San Guido Sassicaia 2015", help="testo per 'vivino'")
     ap.add_argument("-c", "--config", default=None, help="percorso di config.yaml")
     ap.add_argument("-m", "--minutes", type=int, default=20, help="intervallo per 'loop' e 'start'")
     ap.add_argument("--lan", action="store_true", help="dashboard visibile anche dal telefono sulla stessa Wi-Fi")
@@ -57,6 +59,19 @@ def main(argv=None) -> int:
         from .demo import run_demo
         out = run_demo(cfg)
         print(f"Dashboard di esempio: {out}")
+    elif args.command == "vivino":
+        from .vivino import Vivino, SEARCH_URL
+        v = Vivino()
+        r = v.s.get(SEARCH_URL, params={"q": args.query}, timeout=25)
+        dbg = Path(cfg["_root"]) / "debug"
+        dbg.mkdir(exist_ok=True)
+        (dbg / "vivino.html").write_text(r.text, encoding="utf-8")
+        from .vivino import parse_search_html
+        hits = parse_search_html(r.text)
+        print(f"HTTP {r.status_code} · {len(hits)} risultati (pagina salvata in debug/vivino.html)")
+        for h in hits[:8]:
+            print(f"  ★ {h.rating}  ({h.count} voti)  {h.name}  annata {h.year}  {h.price} {h.currency or ''}")
+        return 0 if hits else 2
     elif args.command == "test-telegram":
         from .telegram import Telegram
         tg = Telegram(cfg["telegram"]["token"], cfg["telegram"]["chat_id"])

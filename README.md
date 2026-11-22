@@ -21,7 +21,9 @@ Valuta le aste di vino, Champagne e vini dolci che stai guardando su Catawiki e 
 - **Storico vendite**: le aste chiuse registrate, più un riquadro per importare un tuo CSV di vendite passate.
 - **Come funziona**: la spiegazione di ogni voce.
 
-Per ogni lotto la colonna di destra mostra il conto completo: offerta + commissione Catawiki + spedizione = totale, diviso per le bottiglie, contro il valore di mercato. **Commissione e spedizione vengono lette dalla pagina del lotto su Catawiki** (segno ✓): a ogni pressione il pulsante apre in sottofondo fino a 20 pagine di lotti (`browser.dettagli`), cominciando da quelli che chiudono prima, e ognuna una sola volta. Per i lotti non ancora letti si usano la tariffa standard (9% + 3 €) e la spedizione stimata, indicata come *stimata*. Sotto c'è **fino a che offerta conviene salire** per restare nel tuo sconto.
+Per ogni lotto la colonna di destra mostra il conto completo: offerta + commissione Catawiki + spedizione = totale, diviso per le bottiglie, contro il valore di mercato. La commissione è la tariffa pubblicata da Catawiki (9% + 3 €). **La spedizione viene letta da Catawiki** (segno ✓). Catawiki la carica con una richiesta separata, quindi il pulsante va istruito una volta sola: apri la pagina di un lotto di vino, scorri finché vedi il costo di spedizione e premi il pulsante lì. Da quel momento, a ogni pressione, legge la spedizione verso Italia e Spagna per un massimo di 20 lotti (`browser.dettagli`), cominciando da quelli che chiudono prima e ognuno una sola volta. Finché la spedizione di un lotto non è letta, si usa la stima, segnata con ⚠.
+
+Nella scheda **Occasioni**, sotto le occasioni sicure, la sezione **Da verificare** mostra i lotti che superano il tuo sconto ma hanno un valore di mercato solo indicativo. Sotto c'è **fino a che offerta conviene salire** per restare nel tuo sconto.
 
 ## Punteggi dei vini
 

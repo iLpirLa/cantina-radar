@@ -37,11 +37,73 @@ def _first_eur(text: str) -> float | None:
     return _num(m.group(1)) if m else None
 
 
+_PRICE_KEYS = re.compile(r"amount|price|cost|total|value|fee|rate", re.I)
+_COUNTRY_CODES = {"IT": "italia", "ES": "spagna"}
+
+
+def _money(v, key: str = "") -> float | None:
+    if isinstance(v, bool) or v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v) / (100 if "cent" in key.lower() else 1)
+    if isinstance(v, str):
+        m = re.search(r"[\d.,]+", v)
+        return _num(m.group(0)) if m else None
+    if isinstance(v, dict):
+        for k in ("EUR", "eur", "amount", "value", "cents", "amount_cents", "price"):
+            if k in v:
+                return _money(v[k], k if "cent" in k else key)
+    return None
+
+
+def parse_shipping_json(body: str) -> dict:
+    """Risposta JSON della richiesta di spedizione: {paese|'any': costo minimo}."""
+    import json
+    try:
+        data = json.loads(body)
+    except (ValueError, TypeError):
+        return {}
+    found: dict[str, list[float]] = {}
+
+    def walk(o, country=None):
+        if isinstance(o, dict):
+            c = country
+            for k, v in o.items():
+                if isinstance(v, str) and re.search(r"country|destination|region", k, re.I):
+                    c = _COUNTRY_CODES.get(v.upper()) or next(
+                        (p for p, rx in COUNTRIES.items() if re.fullmatch(rx, v, re.I)), c)
+            if any(re.search(r"free", k, re.I) and v is True for k, v in o.items()):
+                found.setdefault(c or "any", []).append(0.0)
+            for k, v in o.items():
+                if _PRICE_KEYS.search(k) and not re.search(r"insur|assicura|tax|duty|dazi|min_?bid|bid", k, re.I):
+                    val = _money(v, k)
+                    if val is not None and 0 <= val <= 500:
+                        found.setdefault(c or "any", []).append(val)
+                if isinstance(v, (dict, list)):
+                    walk(v, c)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v, country)
+
+    walk(data)
+    return {k: min(v) for k, v in found.items() if v}
+
+
 def parse_details(det: dict) -> dict:
     """Ritorna {ship: {paese|'any': costo}, fee_pct, fee_fixed} con ciò che si riesce a ricavare."""
     texts = [str(t) for t in (det.get("s") or []) if t][:20]
     jsons = [str(t) for t in (det.get("j") or []) if t][:20]
     out: dict = {"ship": {}}
+
+    # --- risposte della richiesta di spedizione (la fonte più affidabile)
+    for k in det.get("k") or []:
+        if not isinstance(k, dict):
+            continue
+        res = parse_shipping_json(str(k.get("b") or ""))
+        cc = _COUNTRY_CODES.get(str(k.get("c") or "").upper())
+        for key, val in res.items():
+            target = cc if (cc and key == "any") else key
+            out["ship"].setdefault(target, val)
 
     # --- commissione: "9% + € 3"
     for t in texts:
@@ -113,7 +175,7 @@ def costs_for_lot(base: dict, lot) -> tuple[dict, str, str]:
     """Costi da usare per un lotto: quelli letti su Catawiki se ci sono, altrimenti le stime.
     Ritorna (costi, fonte_spedizione, fonte_commissione) con fonte = 'catawiki' o 'stima'."""
     c = dict(base)
-    ship_src, fee_src = "stima", "stima"
+    ship_src, fee_src = "stima", "standard"  # 9% + 3 € è la tariffa pubblicata da Catawiki
 
     def col(name):
         try:

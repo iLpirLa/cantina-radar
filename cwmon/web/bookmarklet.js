@@ -5,7 +5,8 @@
 //    Catawiki isola le finestre (Cross-Origin-Opener-Policy)
 // Gli ID dei lotti visti restano nel browser (localStorage) per registrarne poi il prezzo finale.
 (function () {
-  var ORIGIN = "__ORIGIN__", PAGES = __PAGES__, KEY = "cantinaRadarSeen", DKEY = "cantinaRadarDetails", MAXD = __DETAILS__;
+  var ORIGIN = "__ORIGIN__", PAGES = __PAGES__, KEY = "cantinaRadarSeen", DKEY = "cantinaRadarDetails", MAXD = __DETAILS__,
+      TKEY = "cantinaRadarShipTpl";
   if (!/catawiki\./.test(location.hostname)) { alert("Usa il pulsante Cantina Radar da una pagina di catawiki.com"); return; }
   var old = document.getElementById("cantina-radar-panel");
   if (old) old.remove();
@@ -138,11 +139,42 @@
     try { done = JSON.parse(localStorage.getItem(DKEY) || "{}"); } catch (e) {}
     Object.keys(done).forEach(function (id) { if (done[id] < now - 5 * 86400) delete done[id]; });
     var loc = (location.pathname.match(/^\/([a-z]{2})\//) || [0, "it"])[1];
+    // la spedizione viene caricata dalla pagina con una richiesta separata: su una pagina di lotto la individuiamo
+    var tpl = "", resAll = [];
+    try { tpl = localStorage.getItem(TKEY) || ""; } catch (e) {}
+    try { resAll = performance.getEntriesByType("resource").map(function (e) { return e.name; }); } catch (e) {}
+    if (single) {
+      var hit = resAll.filter(function (u) {
+        return u.indexOf(single[1]) >= 0 && /ship|deliver|spediz|envio|versand/i.test(u) && u.indexOf(location.origin) === 0;
+      })[0];
+      if (hit) { tpl = hit.replace(single[1], "{ID}"); try { localStorage.setItem(TKEY, tpl); } catch (e) {} }
+    }
+    async function shipping(id) {
+      if (!tpl) return [];
+      var variants = [{ c: "", u: tpl.replace("{ID}", id) }];
+      if (/=(it|es)(?=&|$)/i.test(tpl)) {
+        variants = ["IT", "ES"].map(function (cc) { return { c: cc, u: tpl.replace("{ID}", id).replace(/=(it|es)(?=&|$)/i, "=" + cc) }; });
+      }
+      var outv = [];
+      for (var v = 0; v < variants.length; v++) {
+        try {
+          var rs = await fetch(variants[v].u, { credentials: "include", headers: { Accept: "application/json" } });
+          if (rs.ok) outv.push({ c: variants[v].c, b: (await rs.text()).slice(0, 6000) });
+        } catch (e) {}
+      }
+      return outv;
+    }
     if (single) {
       det[single[1]] = snippets(document.documentElement.outerHTML, document);
+      det[single[1]].k = await shipping(single[1]);
       done[single[1]] = now;
     }
-    var todo = Object.keys(out).filter(function (id) { return !done[id] && !det[id] && (!seen[id] || seen[id] > now); })
+    // se abbiamo appena scoperto come leggere la spedizione, rileggi anche i lotti già visti
+    if (single && tpl && !done.__tpl) {  // prima volta che abbiamo il modello: rileggi i lotti già visti
+      Object.keys(done).forEach(function (id) { if (id !== single[1]) delete done[id]; });
+      done.__tpl = now;
+    }
+    var todo = Object.keys(out).filter(function (id) { return id !== "__tpl"; }).filter(function (id) { return !done[id] && !det[id] && (!seen[id] || seen[id] > now); })
       .sort(function (a, b) { return (seen[a] || 9e12) - (seen[b] || 9e12); }).slice(0, MAXD);
     for (var k = 0; k < todo.length; k++) {
       say("Spedizione e commissione: lotto " + (k + 1) + " di " + todo.length + "…");
@@ -151,18 +183,16 @@
         if (r3.ok) {
           var h3 = await r3.text();
           det[todo[k]] = snippets(h3, new DOMParser().parseFromString(h3, "text/html"));
-          done[todo[k]] = now;
+          det[todo[k]].k = await shipping(todo[k]);
+          done[todo[k]] = tpl ? now : now - 4 * 86400;  // senza modo di leggere la spedizione: riprova presto
         }
       } catch (e) {}
       await sleep(1000);
     }
     try { localStorage.setItem(DKEY, JSON.stringify(done)); } catch (e) {}
-    var res = [];
-    if (single) {
-      try { res = performance.getEntriesByType("resource").map(function (e) { return e.name.split("?")[0]; })
-        .filter(function (u) { return /\/api\//.test(u); }).slice(0, 40); } catch (e) {}
-    }
-    return { lots: Object.values(out), live: live, live_status: liveStatus, url: location.href, details: det, resources: res };
+    var res = single ? resAll.filter(function (u) { return /\/api\/|graphql/i.test(u); }).slice(0, 60) : [];
+    return { lots: Object.values(out), live: live, live_status: liveStatus, url: location.href, details: det,
+             resources: res, ship_template: tpl };
   }
 
   function openApp(data) {

@@ -257,9 +257,9 @@ function costCalc(l) {
   const e2 = v => "€ " + (Number.isInteger(v) ? v.toLocaleString("it-IT") : v.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   const rows = [
     `<div class="r"><span><span class="op"></span>Offerta attuale</span><span>${e2(bid)}</span></div>`,
-    `<div class="r" title="${feeCw ? "Letta dalla pagina del lotto su Catawiki" : "Tariffa standard Catawiki: non ancora letta dalla pagina del lotto"}"><span><span class="op">+</span>Commissione Catawiki (${+(fp * 100).toFixed(1)}% + ${e2(ff)})${feeCw ? " ✓" : ""}</span><span>${e2(Math.round(fee * 100) / 100)}</span></div>`,
+    `<div class="r" title="${feeCw ? "Letta dalla pagina del lotto su Catawiki" : "Tariffa Buyer Protection pubblicata da Catawiki: 9% dell'offerta + 3 €"}"><span><span class="op">+</span>Commissione Catawiki (${+(fp * 100).toFixed(1)}% + ${e2(ff)})</span><span>${e2(Math.round(fee * 100) / 100)}</span></div>`,
     fromCw ? `<div class="r" title="Letta dalla pagina del lotto su Catawiki"><span><span class="op">+</span>Spedizione (da Catawiki) ✓</span><span>${e2(ship)}</span></div>`
-      : `<div class="r" title="Catawiki non l'ha ancora indicata per questo lotto: stima modificabile nel riquadro 'Il tuo obiettivo'"><span><span class="op">+</span>Spedizione <i>stimata</i> (${esc(paese)}${bt > 1 ? `, ${bt} bott.` : ""})</span><span>${e2(ship)}</span></div>`,
+      : `<div class="r" title="Costo non ancora letto da Catawiki: vedi 'Come funziona'. Stima modificabile nel riquadro 'Il tuo obiettivo'"><span><span class="op">+</span>Spedizione <i>stimata</i> (${esc(paese)}${bt > 1 ? `, ${bt} bott.` : ""}) ⚠</span><span>${e2(ship)}</span></div>`,
     `<div class="r tot"><span><span class="op">=</span>Totale da pagare</span><span>${e2(Math.round(tot))}</span></div>`,
   ];
   if (eq) rows.push(`<div class="r pb"><span><span class="op">÷</span>${eq === 1 ? "1 bottiglia" : String(eq).replace(".", ",") + " bottiglie"} da 0,75 L</span><span>${eur(tot / eq)} a bottiglia</span></div>`);
@@ -307,7 +307,8 @@ function lotCard(l) {
 
 function counts() {
   const L = DATA.lots.filter(l => isOpen(l) && baseFilter(l));
-  $("#nDeals").textContent = L.filter(isDeal).length;
+  const nd = L.filter(isDeal).length, nm = L.filter(isMaybe).length;
+  $("#nDeals").textContent = nm ? `${nd} + ${nm}` : nd;
   $("#nAll").textContent = L.length;
   $("#nTodo").textContent = L.filter(l => l.d == null && !l.mix).length;
   $("#nHist").textContent = DATA.history.length;
@@ -315,13 +316,35 @@ function counts() {
 
 let currentRows = () => [];
 let emptyMsg = "";
+let extraRows = null;
+function isMaybe(l) {
+  const s = S();
+  return isOpen(l) && !isDeal(l) && l.d != null && l.d >= s.sconto_minimo &&
+    (!s.punteggio_minimo || (l.rt || 0) >= s.punteggio_minimo) &&
+    (!s.budget_massimo || (l.bid || 0) <= s.budget_massimo);
+}
+function dealDiag() {
+  const L = DATA.lots.filter(l => isOpen(l) && baseFilter(l));
+  const val = L.filter(l => l.d != null);
+  const best = val.reduce((m, l) => l.d > m.d ? l : m, { d: -9 });
+  const parts = [`${L.length} aste aperte, ${val.length} con valore di mercato`];
+  if (val.length) parts.push(`miglior sconto attuale ${pct(best.d)}`);
+  return parts.join(" · ");
+}
 function refreshList() {
   const r = sortRows(currentRows().filter(baseFilter));
-  $("#list").innerHTML = r.length ? r.slice(0, 300).map(lotCard).join("") : `<div class="empty">${emptyMsg}</div>`;
+  let html = r.length ? r.slice(0, 300).map(lotCard).join("") : `<div class="empty">${emptyMsg}</div>`;
+  if (extraRows) {
+    const x = sortRows(extraRows().filter(baseFilter));
+    if (x.length) html += `<h3 style="font:600 18px var(--serif);color:var(--gold);margin:26px 0 4px">Da verificare (${x.length})</h3>
+      <p class="hint">Superano il tuo sconto, ma il valore di mercato è solo indicativo: viene da un'unica fonte indiretta (spesso il prezzo da negozio su Vivino, di solito più alto dei prezzi in asta), oppure il venditore ha una riserva non ancora raggiunta. Controlla il prezzo e, se ti torna, salvalo con “Correggi il valore”: il lotto passerà tra le occasioni.</p>` +
+      x.slice(0, 100).map(lotCard).join("");
+  }
+  $("#list").innerHTML = html;
   bindForms(); counts();
 }
-function renderList(rows, empty, hint) {
-  currentRows = rows; emptyMsg = empty;
+function renderList(rows, empty, hint, extra) {
+  currentRows = rows; emptyMsg = empty; extraRows = extra || null;
   const v = $("#view"); v.innerHTML = "";
   v.appendChild($("#tplTools").content.cloneNode(true));
   if (hint) v.insertAdjacentHTML("beforeend", `<p class="hint">${hint}</p>`);
@@ -350,11 +373,13 @@ function render() {
   const s = S(), rateTxt = s.punteggio_minimo ? `, Vivino ≥ ${fmtRate(s.punteggio_minimo)}` : "";
   if (tab === "deals") {
     renderList(() => DATA.lots.filter(isDeal),
-      DATA.lots.length ? `Nessuna occasione con il tuo obiettivo (sconto ≥ ${goalPct()}%${rateTxt}).<br><br>
-        Passa dalla scheda <b>Da valutare</b>: inserendo il valore di mercato dei vini che ti interessano, l'app trova gli affari.`
+      DATA.lots.length ? `Nessuna occasione sicura con il tuo obiettivo (sconto ≥ ${goalPct()}%${rateTxt}).<br>
+        <span class="src">${dealDiag()}</span><br><br>
+        Per trovarne di più inserisci il valore dei vini che ti interessano nella scheda <b>Da valutare</b>, oppure abbassa lo sconto minimo nel riquadro in alto.`
         : `Ancora nessun lotto. Apri le aste di vino su Catawiki e premi il pulsante <b>🍷 Cantina Radar</b> nei preferiti
         (<a href="installa.html">come installarlo</a>).`,
-      `Aste aperte che rispettano il tuo obiettivo: sconto ≥ ${goalPct()}%${rateTxt}${s.budget_massimo ? `, offerta ≤ ${eur(s.budget_massimo)}` : ""}, valore affidabile e riserva raggiunta.`);
+      `Aste aperte che rispettano il tuo obiettivo: sconto ≥ ${goalPct()}%${rateTxt}${s.budget_massimo ? `, offerta ≤ ${eur(s.budget_massimo)}` : ""}, valore affidabile e riserva raggiunta.`,
+      isMaybe);
   } else if (tab === "all") {
     renderList(() => DATA.lots.filter(isOpen), "Nessun lotto aperto.", "Tutti i lotti letti dal pulsante e ancora in asta, con il loro giudizio.");
   } else if (tab === "todo") {
@@ -401,7 +426,7 @@ function renderHelp() {
   $("#view").innerHTML = `<div class="card"><h3>Come leggere un lotto</h3><dl>
     <dt>Sconto (es. −38%)</dt><dd>Quanto risparmieresti rispetto al valore di mercato se vincessi all'offerta attuale, già al netto di commissione e spedizione. <b>+12%</b> significa che pagheresti il 12% in più del suo valore.</dd>
     <dt>Affare, Interessante…</dt><dd><b>Affare</b>: sconto pari o superiore al tuo obiettivo. <b>Interessante</b>: almeno metà del tuo obiettivo. <b>Prezzo di mercato</b>: più o meno quanto vale. <b>Sopra il mercato</b>: costa più di quanto vale.</dd>
-    <dt>Costo a bottiglia</dt><dd>Offerta + commissione Catawiki + spedizione, diviso per le bottiglie da 0,75 L (una magnum conta come 2). Commissione e spedizione vengono lette dalla pagina del lotto su Catawiki (segno ✓). Se l'app non ha ancora letto la pagina, usa la tariffa standard (9% + 3 €) e la spedizione stimata verso il paese scelto (${eur(DATA.costs.spedizione_lotto)} a lotto + ${eur(DATA.costs.spedizione_extra_bottiglia)} per ogni bottiglia in più, modificabile nel riquadro "Il tuo obiettivo"), diviso per le bottiglie da 0,75 L. Una magnum conta come 2.</dd>
+    <dt>Costo a bottiglia</dt><dd>Offerta + commissione Catawiki (tariffa pubblicata: 9% + 3 €) + spedizione, diviso per le bottiglie da 0,75 L (una magnum conta come 2). La spedizione viene letta da Catawiki (segno ✓). Catawiki la carica con una richiesta separata: per insegnare al pulsante a leggerla, apri una volta la pagina di un lotto, scorri fino alla sezione della spedizione e premi il pulsante lì. Finché non è letta, si usa la stima verso il paese scelto (segno ⚠) (${eur(DATA.costs.spedizione_lotto)} a lotto + ${eur(DATA.costs.spedizione_extra_bottiglia)} per ogni bottiglia in più, modificabile nel riquadro "Il tuo obiettivo"), diviso per le bottiglie da 0,75 L. Una magnum conta come 2.</dd>
     <dt>Valore di mercato</dt><dd>Quanto vale una bottiglia. Fonti, dalla più affidabile: i prezzi che inserisci tu, lo storico delle aste Catawiki chiuse, il prezzo Vivino, la stima dell'esperto Catawiki.</dd>
     <dt>Affidabilità</dt><dd>Quanto è solida la stima del valore. <b>Alta</b> se viene da un tuo prezzo o da più vendite simili, <b>bassa</b> se si basa su un solo dato indiretto. Le occasioni richiedono almeno un'affidabilità media.</dd>
     <dt>Offri al massimo</dt><dd>L'offerta oltre la quale lo sconto scende sotto il tuo obiettivo. È il numero da tenere a mente quando rilanci negli ultimi minuti.</dd>

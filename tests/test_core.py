@@ -419,4 +419,24 @@ def test_costs_for_lot():
     c, ss, fs = costs_for_lot(base, lot)
     assert c["spedizione_lotto"] == 31.0 and c["spedizione_extra_bottiglia"] == 0 and ss == "catawiki" and fs == "catawiki"
     c, ss, fs = costs_for_lot(base, {"ship_it": None, "ship_es": None, "ship_any": None, "fee_pct": None, "fee_fixed": None})
-    assert c["spedizione_lotto"] == 25.0 and ss == "stima" and fs == "stima"
+    assert c["spedizione_lotto"] == 25.0 and ss == "stima" and fs == "standard"
+
+
+@pytest.mark.parametrize("body,exp", [
+    ('{"shipping_options":[{"country_code":"IT","price":{"EUR":18.5}},{"country_code":"ES","price":{"EUR":24}}]}',
+     {"italia": 18.5, "spagna": 24.0}),
+    ('{"shipping":{"destination":"IT","options":[{"carrier":"UPS","amount_cents":2200},{"carrier":"DHL","amount_cents":1950}]}}',
+     {"italia": 19.5}),
+    ('{"cost":{"amount":30,"currency":"EUR"},"insurance_cost":5}', {"any": 30.0}),
+    ('{"free_shipping":true}', {"any": 0.0}),
+    ('non json', {}),
+])
+def test_parse_shipping_json(body, exp):
+    from cwmon.lotdetails import parse_shipping_json
+    assert parse_shipping_json(body) == exp
+
+
+def test_shipping_response_with_country_variant():
+    from cwmon.lotdetails import parse_details
+    d = parse_details({"k": [{"c": "IT", "b": '{"price": 21}'}, {"c": "ES", "b": '{"price": 28}'}]})
+    assert d["ship"] == {"italia": 21.0, "spagna": 28.0}

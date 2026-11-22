@@ -197,7 +197,7 @@ def reply_command(cfg: dict, db: DB, tg: Telegram, text: str) -> None:
 
 
 # ----------------------------------------------------------------------- run
-def run_once(cfg: dict, build_dashboard: bool = True, collect_data: bool = True) -> dict:
+def run_once(cfg: dict, build_dashboard: bool = True, collect_data: bool = True, commands: bool = True) -> dict:
     from datetime import datetime
     from zoneinfo import ZoneInfo
     from .dashboard import build
@@ -205,7 +205,8 @@ def run_once(cfg: dict, build_dashboard: bool = True, collect_data: bool = True)
     db = DB(cfg["db_path"])
     tg = Telegram(cfg["telegram"]["token"], cfg["telegram"]["chat_id"])
     summary: dict = {}
-    handle_commands(cfg, db, tg)  # prima i comandi, così le nuove soglie valgono subito
+    if commands:
+        handle_commands(cfg, db, tg)  # prima i comandi, così le nuove soglie valgono subito
     if collect_data:
         client = CatawikiClient(cfg["catawiki"]["request_delay"], cfg["catawiki"]["scrape_locale"])
         summary.update(collect(cfg, db, client))
@@ -216,5 +217,6 @@ def run_once(cfg: dict, build_dashboard: bool = True, collect_data: bool = True)
     if build_dashboard:
         out = build(cfg, db)
         summary["dashboard"] = str(out)
+    db.conn.close()
     log.info("Ciclo completato: %s", summary)
     return summary

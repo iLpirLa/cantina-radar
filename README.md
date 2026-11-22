@@ -2,7 +2,7 @@
 
 Monitora le aste di vino, Champagne e vini dolci su Catawiki e ti segnala, su **Telegram** e su una **dashboard web**, i lotti il cui costo reale è nettamente sotto il valore di mercato.
 
-- **Gratis**: gira su GitHub Actions (nessun server). La dashboard è pubblicata su GitHub Pages.
+- **Gratis**: gira sul tuo PC. Catawiki blocca le richieste dai server cloud come GitHub Actions (errore 403), quindi la raccolta deve partire dalla tua connessione di casa.
 - **Costo reale**: offerta + commissione Catawiki (9% + 3 €) + spedizione stimata, diviso per bottiglie equivalenti da 0,75 L (una magnum vale 2).
 - **Offerta massima consigliata**: per ogni lotto ti dice fino a quanto puoi offrire restando sopra il tuo sconto minimo.
 - **Uso esclusivamente personale.**
@@ -36,34 +36,37 @@ Bollinger Special Cuvée Champagne,,55,vivino,annata vuota = qualunque annata/NV
 
 ---
 
-## Installazione (circa 20 minuti, una volta sola)
+## Installazione sul PC (10 minuti, una volta sola)
 
 ### 1. Crea il bot Telegram
-1. Su Telegram apri **@BotFather**, invia `/newbot`, scegli un nome. Ricevi un **token** (tipo `123456:ABC...`).
-2. Apri il tuo nuovo bot e premi **Avvia** (o scrivigli un messaggio qualsiasi).
-3. Apri **@userinfobot**: ti risponde con il tuo **ID** numerico. Questo è il `TELEGRAM_CHAT_ID`.
+1. Su Telegram cerca **@BotFather**, invia `/newbot`, scegli un nome e uno username che finisca con `bot`. Ricevi un **token** (tipo `7123456789:AAH...`).
+2. Apri il link del tuo nuovo bot e premi **Avvia**.
+3. Cerca **@userinfobot** e premi **Avvia**: ti risponde con il tuo **Id** numerico.
 
-### 2. Metti il progetto su GitHub
-1. Crea un account gratuito su [github.com](https://github.com) se non ce l'hai.
-2. **New repository** → nome per esempio `cantina-radar` → **Public** → *Create repository*.
-   *Pubblico* significa minuti di Actions illimitati e Pages gratuito. Nel repository ci sono solo il codice e dati pubblici di Catawiki. Il token Telegram resta segreto (vedi passo 3).
-3. Nella pagina del repository: **Add file → Upload files** e trascina **tutto il contenuto** della cartella del progetto, compresa la cartella nascosta `.github`. Su Mac, nel Finder premi `Cmd+Shift+.` per vedere i file nascosti. Poi *Commit changes*.
-   - In alternativa usa [GitHub Desktop](https://desktop.github.com/).
+### 2. Installa Python (se non ce l'hai)
+Scaricalo da [python.org/downloads](https://www.python.org/downloads/). Su Windows, durante l'installazione spunta **"Add python.exe to PATH"**.
 
-### 3. Inserisci i segreti
-**Settings → Secrets and variables → Actions → New repository secret**, due volte:
-- `TELEGRAM_BOT_TOKEN` = il token di BotFather
-- `TELEGRAM_CHAT_ID` = il tuo ID
+### 3. Scarica il progetto
+Sulla pagina del repository: **Code → Download ZIP**, poi estrai la cartella dove preferisci (per esempio in Documenti).
 
-### 4. Attiva la dashboard
-**Settings → Pages → Build and deployment → Source: GitHub Actions**.
+### 4. Avvia con un doppio clic
+- **Windows:** `avvia-windows.bat`. Se compare l'avviso "PC protetto da Windows", clicca *Ulteriori informazioni → Esegui comunque*.
+- **Mac:** apri il Terminale, scrivi `bash ` (con lo spazio), trascina dentro il file `avvia-mac.command` e premi Invio. Dalle volte successive basta il doppio clic sul file.
 
-### 5. Primo avvio
-**Actions** → *Monitor aste vino* → **Run workflow**. Dopo 2–5 minuti:
-- la dashboard è su `https://<tuo-utente>.github.io/cantina-radar/`
-- su Telegram scrivi `/aiuto` al bot (la risposta arriva al ciclo successivo, vedi sotto).
+La prima volta lo script installa tutto e apre il file `.env`. Lì scrivi il token e il tuo Id al posto degli esempi, salva e chiudi:
+```
+TELEGRAM_BOT_TOKEN=7123456789:AAH...
+TELEGRAM_CHAT_ID=6513444198
+```
+Poi si apre la dashboard nel browser e parte il monitoraggio, che si ripete ogni 20 minuti. **Lascia aperta la finestra nera**: finché è aperta ricevi gli avvisi, e il bot risponde subito ai comandi. Lo script mostra anche un indirizzo `http://192.168.x.x:8000/` per aprire la dashboard dal telefono, se è sulla stessa Wi-Fi.
 
-Da qui in poi gira da solo ogni 30 minuti, dalle 7:00 alle 23:30.
+> Il PC deve restare acceso e non andare in stop. Il Mac viene tenuto sveglio in automatico. Su Windows controlla *Impostazioni → Sistema → Alimentazione → Sospensione: Mai* (almeno quando è collegato alla corrente). Per un monitoraggio sempre acceso, va benissimo un vecchio portatile o un Raspberry Pi.
+
+### Primo controllo
+Se non arrivano lotti, apri un terminale nella cartella ed esegui `.venv\Scripts\python -m cwmon doctor` (Windows) oppure `.venv/bin/python -m cwmon doctor` (Mac). Ti dice quale passaggio non funziona e salva dei campioni in `debug/`.
+
+### E GitHub?
+Il repository resta il posto dove si trova il codice: ogni aggiornamento lo trovi lì. L'esecuzione automatica su GitHub Actions è disattivata perché Catawiki la blocca.
 
 ---
 
@@ -78,7 +81,7 @@ Da qui in poi gira da solo ogni 30 minuti, dalle 7:00 alle 23:30.
 | `/ore 3` | Avvisa per lotti che chiudono entro 3 ore |
 | `/pausa` · `/riprendi` | Sospende/riattiva gli avvisi |
 
-Su GitHub Actions i comandi vengono letti a ogni ciclo, quindi **la risposta arriva entro circa 30 minuti**. Se tieni l'app accesa sul PC (`python -m cwmon bot`) risponde subito. Il bot accetta comandi solo dalla tua chat.
+Con l'app avviata sul PC il bot risponde subito. Accetta comandi solo dalla tua chat.
 
 Ogni lotto genera al massimo due avvisi: il primo quando entra nella finestra di chiusura, e un'**ultima chiamata** negli ultimi 45 minuti se è ancora conveniente.
 
@@ -103,6 +106,7 @@ pip install -r requirements.txt
 cp .env.example .env          # inserisci token e chat id
 python -m cwmon doctor        # verifica che la lettura di Catawiki funzioni
 python -m cwmon demo          # dashboard con dati di esempio in site-demo/index.html
+python -m cwmon start         # tutto insieme: monitoraggio + bot + dashboard (quello che usano gli script)
 python -m cwmon run           # un ciclo completo
 python -m cwmon loop -m 15    # ciclo ogni 15 minuti, finché il PC resta acceso
 python -m cwmon serve         # apre la dashboard su http://localhost:8000
@@ -115,11 +119,10 @@ python -m pytest              # test automatici
 ## Limiti da conoscere
 
 - **Catawiki non ha un'API pubblica.** L'app legge le pagine pubbliche di categoria e l'endpoint che il sito usa per le offerte live: poche richieste, distanziate di 2 secondi. Se Catawiki cambia struttura, la lettura può smettere di funzionare. Lancia `python -m cwmon doctor`: salva in `debug/` i campioni grezzi utili per sistemare il parser.
-- **Il servizio potrebbe bloccare gli IP di GitHub.** Se `doctor` funziona dal tuo PC ma i cicli su Actions non trovano lotti, usa la modalità locale (`loop`).
+- **Catawiki blocca le richieste dai server cloud** (GitHub Actions, verificato: HTTP 403). Per questo l'app gira sul PC.
 - **Gli avvisi sono indicativi.** Verifica sempre livello del vino, condizioni di conservazione, spedizione reale e dazi (i venditori extra-UE possono comportare IVA all'importazione).
 - **L'ultimo minuto conta.** Molte offerte arrivano negli ultimi minuti: lo sconto a 3 ore dalla chiusura tende a ridursi. Per questo l'app ti dà l'**offerta massima**, non solo lo sconto attuale.
-- GitHub sospende i workflow programmati dopo 60 giorni senza attività nel repository. In quel caso basta rientrare in **Actions** e riattivarlo.
-- I cicli di GitHub Actions possono partire con 5–15 minuti di ritardo nelle ore di punta.
+- Gli avvisi arrivano solo mentre il PC è acceso e l'app è aperta.
 
 ---
 
@@ -136,5 +139,6 @@ cwmon/
   db.py            database SQLite (salvato sul branch "data" del repository)
 config.yaml        impostazioni
 riferimenti.csv    i tuoi prezzi di riferimento
-.github/workflows/monitor.yml   esecuzione automatica gratuita
+.github/workflows/monitor.yml   esecuzione su GitHub (solo manuale: Catawiki la blocca)
+avvia-windows.bat / avvia-mac.command   avvio con doppio clic
 ```

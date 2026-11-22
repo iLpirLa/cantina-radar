@@ -1,4 +1,5 @@
 """Uso:
+    python -m cwmon start          TUTTO INSIEME sul PC: monitoraggio ogni 20 min + bot + dashboard
     python -m cwmon run            un ciclo completo (raccolta, valutazione, avvisi, dashboard)
     python -m cwmon loop -m 30     ripete il ciclo ogni 30 minuti (per tenerlo acceso sul PC)
     python -m cwmon serve          rigenera la dashboard e la apre su http://localhost:8000
@@ -21,9 +22,10 @@ from .config import load_config
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="cwmon", description="Catawiki Wine Monitor")
-    ap.add_argument("command", choices=["run", "loop", "serve", "bot", "doctor", "demo", "test-telegram"])
+    ap.add_argument("command", choices=["start", "run", "loop", "serve", "bot", "doctor", "demo", "test-telegram"])
     ap.add_argument("-c", "--config", default=None, help="percorso di config.yaml")
-    ap.add_argument("-m", "--minutes", type=int, default=30, help="intervallo per 'loop'")
+    ap.add_argument("-m", "--minutes", type=int, default=20, help="intervallo per 'loop' e 'start'")
+    ap.add_argument("--lan", action="store_true", help="dashboard visibile anche dal telefono sulla stessa Wi-Fi")
     ap.add_argument("-p", "--port", type=int, default=8000, help="porta per 'serve'")
     ap.add_argument("--no-collect", action="store_true", help="salta la raccolta (solo valutazione/avvisi)")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -32,7 +34,9 @@ def main(argv=None) -> int:
                         format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
     cfg = load_config(args.config)
 
-    if args.command == "run":
+    if args.command == "start":
+        start(cfg, args.minutes, args.port, args.lan)
+    elif args.command == "run":
         from .monitor import run_once
         print(json.dumps(run_once(cfg, collect_data=not args.no_collect), ensure_ascii=False, indent=2))
     elif args.command == "loop":
@@ -61,6 +65,56 @@ def main(argv=None) -> int:
             return 1
         print(tg.send("✅ Catawiki Wine Monitor collegato. Scrivi /aiuto per i comandi."))
     return 0
+
+
+def start(cfg: dict, minutes: int, port: int, lan: bool) -> None:
+    """Modalità PC: ciclo periodico + bot Telegram + dashboard locale, in un solo processo."""
+    import functools
+    import http.server
+    import threading
+    import webbrowser
+    from .dashboard import build
+    from .db import DB
+    from .monitor import run_once
+
+    site = Path(cfg["_root"]) / cfg["dashboard"]["cartella"]
+    db = DB(cfg["db_path"])
+    build(cfg, db)
+    db.conn.close()
+    host = "0.0.0.0" if lan else "127.0.0.1"
+    class Quiet(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *a, **k):
+            pass
+
+    handler = functools.partial(Quiet, directory=str(site))
+    srv = http.server.ThreadingHTTPServer((host, port), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    url = f"http://localhost:{port}/"
+    print(f"\n  Dashboard: {url}")
+    if lan:
+        import socket
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(("8.8.8.8", 80))
+            print(f"  Dal telefono (stessa Wi-Fi): http://{s.getsockname()[0]}:{port}/")
+            s.close()
+        except OSError:
+            pass
+    if cfg["telegram"]["token"]:
+        threading.Thread(target=run_bot, args=(cfg,), daemon=True).start()
+        print("  Bot Telegram: attivo")
+    else:
+        print("  Bot Telegram: non configurato (manca il file .env)")
+    print(f"  Monitoraggio: ogni {minutes} minuti. Lascia aperta questa finestra (Ctrl+C per uscire).\n")
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+    while True:
+        try:
+            run_once(cfg, commands=False)
+        except Exception:
+            logging.exception("Ciclo fallito, riprovo al prossimo giro")
+        time.sleep(minutes * 60)
 
 
 def serve(cfg: dict, port: int) -> None:
@@ -94,7 +148,7 @@ def run_bot(cfg: dict) -> None:
         print("Imposta TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID")
         return
     db = DB(cfg["db_path"])
-    print("Bot in ascolto (Ctrl+C per uscire)…")
+    logging.info("Bot in ascolto")
     while True:
         try:
             handle_commands(cfg, db, tg, timeout=50)

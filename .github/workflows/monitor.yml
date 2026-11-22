@@ -1,9 +1,12 @@
 name: Monitor aste vino
 
+# ATTENZIONE: Catawiki blocca le richieste dai server di GitHub (HTTP 403), quindi l'esecuzione
+# automatica è disattivata e l'app va avviata dal PC (vedi README). Il workflow resta lanciabile a mano
+# per una verifica. Per riattivarlo, togli il commento alle tre righe "schedule".
 on:
-  schedule:
-    # Ogni 30 minuti dalle 07:00 alle 23:30 ora italiana (orari in UTC; d'estate scorrono di un'ora)
-    - cron: "*/30 6-22 * * *"
+  # schedule:
+  #   # Ogni 30 minuti dalle 07:00 alle 23:30 ora italiana (orari in UTC)
+  #   - cron: "*/30 6-22 * * *"
   workflow_dispatch: {}   # pulsante "Run workflow" per lanciarlo a mano
 
 permissions:

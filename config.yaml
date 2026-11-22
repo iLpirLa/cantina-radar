@@ -2,6 +2,8 @@
 # Modifica questi valori e salva: verranno usati al ciclo successivo.
 
 catawiki:
+  # NB: la raccolta automatica non funziona perché Catawiki blocca le richieste dei programmi.
+  # Si usa il pulsante nel browser (vedi README). Queste impostazioni valgono solo per "doctor".
   # Categorie da monitorare (ID Catawiki)
   #   443 = Vino, 961 = Champagne, 971 = Porto e vini dolci
   #   437 = Whisky, 965 = Rum, Cognac e distillati (il parser è pensato per il vino)
@@ -58,3 +60,8 @@ dashboard:
   cartella: site
   # Mostra in dashboard solo i lotti che chiudono entro N ore (0 = tutti quelli tracciati e aperti)
   ore_max: 48
+
+browser:
+  # Quante pagine legge il pulsante "Cantina Radar" a ogni pressione (25 lotti per pagina),
+  # a partire da quella che stai guardando. Dopo una modifica, reinstalla il pulsante dalla pagina installa.html
+  pagine: 4

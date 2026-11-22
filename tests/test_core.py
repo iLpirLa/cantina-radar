@@ -210,3 +210,41 @@ def test_collect_end_to_end(tmp_path, monkeypatch):
     assert lynch["vintage"] == 2008 and lynch["current_bid"] == 40 and lynch["estimate_low"] == 110
     assert lynch["discount"] > 0.3  # riferimento d'esempio 135 € + stima esperto
     assert (tmp_path / "site" / "index.html").exists()
+
+
+def test_ingest_from_browser(tmp_path):
+    from cwmon.server import ingest, pending_ids, _fallback_from_text
+    cfg = load_config()
+    cfg["db_path"] = str(tmp_path / "b.db")
+    cfg["dashboard"]["cartella"] = str(tmp_path / "site")
+    db = DB(cfg["db_path"])
+    end = int(time.time()) + 3600
+    payload = {
+        "url": "https://www.catawiki.com/it/c/443-vino",
+        "lots": [
+            {"id": 1001, "slug": "x", "title": "2015 Tenuta San Guido, Sassicaia - Bolgheri - 1 Bottle (0.75L)", "img": "", "text": ""},
+            {"id": 1002, "slug": "", "title": "2016 Gaja - Barbaresco - 1 Bottle (0.75L)",
+             "text": "2016 Gaja - Barbaresco - 1 Bottle (0.75L) Offerta attuale € 1.150 2 ore 5 min"},
+        ],
+        "live": [{"id": 1001, "bid": {"EUR": 120}, "bidding_end_time": end * 1000, "close_status": "open"}],
+        "live_status": 200,
+    }
+    res = ingest(cfg, db, payload)
+    assert res["lotti"] == 2 and res["nuovi"] == 2 and res["con_offerta"] == 1 and res["occasioni"] == 1
+    gaja = db.conn.execute("SELECT * FROM lots WHERE id=1002").fetchone()
+    assert gaja["current_bid"] == 1150 and gaja["category_id"] == 443
+    assert abs(gaja["end_time"] - (time.time() + 2 * 3600 + 300)) < 60
+    assert set(pending_ids(db)) == {1001, 1002}
+    assert (tmp_path / "site" / "index.html").exists()
+    assert _fallback_from_text("Current bid € 45 1 day left", "") ["current_bid"] == 45
+
+
+def test_bookmarklet_generation(tmp_path):
+    import urllib.parse
+    from cwmon.server import write_static
+    cfg = load_config()
+    cfg["dashboard"]["cartella"] = str(tmp_path / "site")
+    site = write_static(cfg, 8000)
+    html = (site / "installa.html").read_text(encoding="utf-8")
+    assert "javascript:" in html and "__ORIGIN__" not in html and "__PAGES__" not in html
+    assert (site / "ingest.html").exists()

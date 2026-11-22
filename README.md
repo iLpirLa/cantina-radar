@@ -1,8 +1,10 @@
 # 🍷 Catawiki Wine Monitor ("Cantina Radar")
 
-Monitora le aste di vino, Champagne e vini dolci su Catawiki e ti segnala, su **Telegram** e su una **dashboard web**, i lotti il cui costo reale è nettamente sotto il valore di mercato.
+Valuta le aste di vino, Champagne e vini dolci che stai guardando su Catawiki e ti mostra quali hanno un costo reale nettamente sotto il valore di mercato. I risultati arrivano su una **dashboard web** e, per le occasioni, su **Telegram**.
 
-- **Gratis**: gira sul tuo PC. Catawiki blocca le richieste dai server cloud come GitHub Actions (errore 403), quindi la raccolta deve partire dalla tua connessione di casa.
+- **Come funziona**: su Catawiki premi il pulsante **🍷 Cantina Radar** nella barra dei preferiti. Il pulsante legge i lotti della pagina che stai guardando (più alcune pagine successive) e le offerte aggiornate, poi li passa all'app sul tuo computer, che li valuta.
+- **Perché un pulsante e non un monitoraggio automatico**: Catawiki blocca le richieste che arrivano da programmi (errore 403, verificato sia dai server di GitHub sia da un Mac di casa). Il pulsante lavora dentro il tuo browser, mentre navighi tu, quindi rispetta questo blocco.
+- **Gratis**: gira sul tuo computer, senza servizi a pagamento.
 - **Costo reale**: offerta + commissione Catawiki (9% + 3 €) + spedizione stimata, diviso per bottiglie equivalenti da 0,75 L (una magnum vale 2).
 - **Offerta massima consigliata**: per ogni lotto ti dice fino a quanto puoi offrire restando sopra il tuo sconto minimo.
 - **Uso esclusivamente personale.**
@@ -15,12 +17,11 @@ Monitora le aste di vino, Champagne e vini dolci su Catawiki e ti segnala, su **
 |---|---|---|
 | `riferimenti.csv` | alta (90%) | I prezzi che inserisci tu, per bottiglia (da Wine-Searcher, Vivino, la tua enoteca…) |
 | Storico stessa annata | 45–85% | Prezzi finali delle aste Catawiki chiuse, registrati automaticamente dall'app. Più vendite = più affidabile |
-| Stima dell'esperto | 60% | La forchetta che Catawiki mostra sulla pagina del lotto (quando c'è) |
 | Storico altre annate | 35% | Stesso vino, annate diverse: mostrato in dashboard ma sotto la soglia degli avvisi |
 
 Se ci sono più fonti, il valore è una media pesata sull'affidabilità. Quando le fonti concordano l'affidabilità sale, quando divergono scende.
 
-> **All'inizio lo storico è vuoto.** Nelle prime settimane gli avvisi arrivano soprattutto dai vini che hai messo in `riferimenti.csv` e dalle stime degli esperti. Lo storico cresce da solo a ogni asta chiusa: dopo un mese copre già molti vini ricorrenti.
+> **All'inizio lo storico è vuoto.** Nelle prime settimane le valutazioni vengono soprattutto dai vini che hai messo in `riferimenti.csv`. Lo storico cresce a ogni pressione del pulsante, con i prezzi finali delle aste chiuse che avevi visto.
 
 ### Il file `riferimenti.csv`
 
@@ -58,12 +59,18 @@ La prima volta lo script installa tutto e apre il file `.env`. Lì scrivi il tok
 TELEGRAM_BOT_TOKEN=7123456789:AAH...
 TELEGRAM_CHAT_ID=6513444198
 ```
-Poi si apre la dashboard nel browser e parte il monitoraggio, che si ripete ogni 20 minuti. **Lascia aperta la finestra nera**: finché è aperta ricevi gli avvisi, e il bot risponde subito ai comandi. Lo script mostra anche un indirizzo `http://192.168.x.x:8000/` per aprire la dashboard dal telefono, se è sulla stessa Wi-Fi.
+**Lascia aperta la finestra nera**: finché è aperta funzionano la dashboard, il pulsante e il bot.
 
-> Il PC deve restare acceso e non andare in stop. Il Mac viene tenuto sveglio in automatico. Su Windows controlla *Impostazioni → Sistema → Alimentazione → Sospensione: Mai* (almeno quando è collegato alla corrente). Per un monitoraggio sempre acceso, va benissimo un vecchio portatile o un Raspberry Pi.
+### 5. Installa il pulsante (una volta sola)
+Al primo avvio si apre la pagina `http://localhost:8000/installa.html`. Trascina il pulsante rosso **🍷 Cantina Radar** nella barra dei preferiti del browser. La pagina spiega anche come mostrare la barra se non la vedi.
 
-### Primo controllo
-Se non arrivano lotti, apri un terminale nella cartella ed esegui `.venv\Scripts\python -m cwmon doctor` (Windows) oppure `.venv/bin/python -m cwmon doctor` (Mac). Ti dice quale passaggio non funziona e salva dei campioni in `debug/`.
+### 6. Usalo
+1. Su catawiki.com apri le aste di vino. Il modo migliore è la categoria **Vino** con il filtro *"Chiude oggi"*.
+2. Premi **🍷 Cantina Radar** nei preferiti.
+3. Si apre una finestra che legge la pagina corrente e le 3 successive (circa 100 lotti; cambia il numero con `browser.pagine` in `config.yaml`) e ti porta alla dashboard. Le occasioni sopra soglia ti arrivano anche su Telegram.
+4. Ripeti quando vuoi aggiornare le offerte, per esempio nell'ultima ora prima della chiusura. Ogni pressione registra anche i **prezzi finali** delle aste già chiuse che avevi visto: così lo storico si arricchisce da solo.
+
+La dashboard si apre anche dal telefono, sulla stessa Wi-Fi: lo script mostra l'indirizzo `http://192.168.x.x:8000/`.
 
 ### E GitHub?
 Il repository resta il posto dove si trova il codice: ogni aggiornamento lo trovi lì. L'esecuzione automatica su GitHub Actions è disattivata perché Catawiki la blocca.
@@ -83,7 +90,7 @@ Il repository resta il posto dove si trova il codice: ogni aggiornamento lo trov
 
 Con l'app avviata sul PC il bot risponde subito. Accetta comandi solo dalla tua chat.
 
-Ogni lotto genera al massimo due avvisi: il primo quando entra nella finestra di chiusura, e un'**ultima chiamata** negli ultimi 45 minuti se è ancora conveniente.
+Gli avvisi partono quando premi il pulsante e trovi lotti sopra soglia che chiudono entro la finestra impostata. Ogni lotto genera al massimo due avvisi: il primo, e un'**ultima chiamata** se lo riaggiorni negli ultimi 45 minuti ed è ancora conveniente.
 
 ---
 
@@ -97,18 +104,16 @@ I parametri principali (sono tutti commentati nel file):
 
 ---
 
-## Uso sul tuo PC (facoltativo)
+## Comandi da terminale (facoltativo)
 
 Serve Python 3.10 o superiore.
 
 ```bash
 pip install -r requirements.txt
 cp .env.example .env          # inserisci token e chat id
-python -m cwmon doctor        # verifica che la lettura di Catawiki funzioni
+python -m cwmon doctor        # prova la lettura automatica (oggi bloccata da Catawiki)
 python -m cwmon demo          # dashboard con dati di esempio in site-demo/index.html
-python -m cwmon start         # tutto insieme: monitoraggio + bot + dashboard (quello che usano gli script)
-python -m cwmon run           # un ciclo completo
-python -m cwmon loop -m 15    # ciclo ogni 15 minuti, finché il PC resta acceso
+python -m cwmon start --lan   # quello che usano gli script: dashboard + pulsante + bot
 python -m cwmon serve         # apre la dashboard su http://localhost:8000
 python -m cwmon bot           # bot con risposte immediate
 python -m pytest              # test automatici
@@ -118,11 +123,10 @@ python -m pytest              # test automatici
 
 ## Limiti da conoscere
 
-- **Catawiki non ha un'API pubblica.** L'app legge le pagine pubbliche di categoria e l'endpoint che il sito usa per le offerte live: poche richieste, distanziate di 2 secondi. Se Catawiki cambia struttura, la lettura può smettere di funzionare. Lancia `python -m cwmon doctor`: salva in `debug/` i campioni grezzi utili per sistemare il parser.
-- **Catawiki blocca le richieste dai server cloud** (GitHub Actions, verificato: HTTP 403). Per questo l'app gira sul PC.
+- **Catawiki non ha un'API pubblica e blocca le richieste automatiche.** Il pulsante legge solo ciò che il tuo browser vede già. Per farlo usa lo stesso endpoint delle offerte live che usa la pagina, e legge al massimo poche pagine per pressione, una ogni 1,5 secondi. Se Catawiki cambia la struttura delle pagine, il pulsante potrebbe trovare meno lotti o titoli incompleti: segnalamelo.
+- **Niente avvisi mentre sei lontano dal computer.** Le valutazioni si aggiornano quando premi il pulsante.
 - **Gli avvisi sono indicativi.** Verifica sempre livello del vino, condizioni di conservazione, spedizione reale e dazi (i venditori extra-UE possono comportare IVA all'importazione).
 - **L'ultimo minuto conta.** Molte offerte arrivano negli ultimi minuti: lo sconto a 3 ore dalla chiusura tende a ridursi. Per questo l'app ti dà l'**offerta massima**, non solo lo sconto attuale.
-- Gli avvisi arrivano solo mentre il PC è acceso e l'app è aperta.
 
 ---
 
@@ -130,7 +134,9 @@ python -m pytest              # test automatici
 
 ```
 cwmon/
-  catawiki.py      lettura pagine categoria, offerte live, stima esperto
+  web/             pulsante per il browser (bookmarklet), pagina di installazione e di importazione
+  server.py        server locale: dashboard e importazione dei lotti
+  catawiki.py      interpretazione dei dati Catawiki (offerte live, elenchi)
   parser.py        interpretazione dei titoli (annata, produttore, formato, n. bottiglie)
   valuation.py     valore di mercato, costo reale, offerta massima
   monitor.py       ciclo principale, avvisi, comandi Telegram

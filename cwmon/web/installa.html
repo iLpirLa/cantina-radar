@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cantina Radar · installa il pulsante</title>
+<style>
+  body{margin:0;background:#16110f;color:#f3ebe4;font:15px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{max-width:720px;margin:0 auto;padding:40px 24px}
+  h1{font:600 30px Georgia,serif;margin:0 0 6px} h1 span{color:#d6b26e;font-style:italic;font-weight:400}
+  h2{font:600 19px Georgia,serif;margin:32px 0 8px;color:#d6b26e}
+  .mute{color:#a8978b}
+  .bm{display:inline-block;margin:18px 0;padding:12px 22px;border-radius:999px;background:#8e1b3a;border:1px solid #b8325a;
+      color:#fff;text-decoration:none;font-weight:600;cursor:grab;font-size:16px}
+  ol li{margin:6px 0} code{background:#271e1a;padding:2px 6px;border-radius:5px}
+  textarea{width:100%;height:90px;background:#1f1815;color:#a8978b;border:1px solid #3a2d27;border-radius:8px;font:12px monospace}
+  a{color:#d6b26e}
+</style></head>
+<body><main>
+  <h1>Cantina <span>Radar</span></h1>
+  <p class="mute">Installa il pulsante nella barra dei preferiti: si fa una volta sola.</p>
+
+  <h2>1. Trascina questo pulsante nella barra dei preferiti</h2>
+  <a class="bm" id="bm" href="#">🍷 Cantina Radar</a>
+  <ol>
+    <li>Se non vedi la barra dei preferiti: <b>Chrome</b> <code>Cmd+Shift+B</code> (Windows <code>Ctrl+Shift+B</code>), <b>Safari</b> menu Vista → Mostra barra dei Preferiti.</li>
+    <li>Tieni premuto il pulsante rosso qui sopra e trascinalo nella barra.</li>
+  </ol>
+  <p class="mute">Non riesci a trascinarlo? Crea un preferito qualsiasi, modificalo e incolla come indirizzo (URL) il testo qui sotto:</p>
+  <textarea id="code" readonly onclick="this.select()"></textarea>
+
+  <h2>2. Usalo su Catawiki</h2>
+  <ol>
+    <li>Tieni aperta l'app (la finestra nera avviata con <code>avvia-mac.command</code> o <code>avvia-windows.bat</code>).</li>
+    <li>Su catawiki.com apri le aste che ti interessano. Il modo migliore è la categoria Vino con il filtro <i>"Chiude oggi"</i>, ordinata per chiusura.</li>
+    <li>Premi <b>🍷 Cantina Radar</b> nei preferiti. Si apre una finestra che analizza la pagina corrente e le __PAGES_MINUS__ successive, poi ti porta alla dashboard.</li>
+    <li>Ripeti quando vuoi aggiornare le offerte: ogni pressione aggiorna anche i lotti già visti e registra i prezzi finali delle aste chiuse, che arricchiscono lo storico.</li>
+  </ol>
+  <p class="mute">La prima volta il browser potrebbe chiedere di consentire i popup per catawiki.com: accetta.</p>
+  <p><a href="/">← Torna alla dashboard</a></p>
+</main>
+<script>
+  const code = __BOOKMARKLET__;
+  document.getElementById("bm").href = code;
+  document.getElementById("code").value = code;
+  document.getElementById("bm").addEventListener("click", e => { e.preventDefault(); alert("Trascinalo nella barra dei preferiti, non cliccarlo qui 🙂"); });
+</script>
+</body></html>

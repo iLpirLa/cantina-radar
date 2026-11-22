@@ -1,5 +1,5 @@
 """Uso:
-    python -m cwmon start          TUTTO INSIEME sul PC: monitoraggio ogni 20 min + bot + dashboard
+    python -m cwmon start          TUTTO INSIEME sul PC: dashboard + pulsante per il browser + bot
     python -m cwmon run            un ciclo completo (raccolta, valutazione, avvisi, dashboard)
     python -m cwmon loop -m 30     ripete il ciclo ogni 30 minuti (per tenerlo acceso sul PC)
     python -m cwmon serve          rigenera la dashboard e la apre su http://localhost:8000
@@ -68,27 +68,23 @@ def main(argv=None) -> int:
 
 
 def start(cfg: dict, minutes: int, port: int, lan: bool) -> None:
-    """Modalità PC: ciclo periodico + bot Telegram + dashboard locale, in un solo processo."""
-    import functools
+    """Modalità PC: dashboard + importazione dal pulsante nel browser + bot Telegram."""
     import http.server
     import threading
     import webbrowser
     from .dashboard import build
     from .db import DB
-    from .monitor import run_once
+    from .monitor import score_all
+    from .server import make_handler, write_static
 
-    site = Path(cfg["_root"]) / cfg["dashboard"]["cartella"]
+    site = write_static(cfg, port)
     db = DB(cfg["db_path"])
+    score_all(cfg, db)
     build(cfg, db)
+    first_time = db.stats()["tracciati"] == 0
     db.conn.close()
     host = "0.0.0.0" if lan else "127.0.0.1"
-    class Quiet(http.server.SimpleHTTPRequestHandler):
-        def log_message(self, *a, **k):
-            pass
-
-    handler = functools.partial(Quiet, directory=str(site))
-    srv = http.server.ThreadingHTTPServer((host, port), handler)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    srv = http.server.ThreadingHTTPServer((host, port), make_handler(cfg, site))
     url = f"http://localhost:{port}/"
     print(f"\n  Dashboard: {url}")
     if lan:
@@ -99,22 +95,18 @@ def start(cfg: dict, minutes: int, port: int, lan: bool) -> None:
             s.close()
         except OSError:
             pass
+    print(f"  Pulsante per Catawiki: {url}installa.html")
     if cfg["telegram"]["token"]:
         threading.Thread(target=run_bot, args=(cfg,), daemon=True).start()
         print("  Bot Telegram: attivo")
     else:
         print("  Bot Telegram: non configurato (manca il file .env)")
-    print(f"  Monitoraggio: ogni {minutes} minuti. Lascia aperta questa finestra (Ctrl+C per uscire).\n")
+    print("  Lascia aperta questa finestra (Ctrl+C per uscire).\n")
     try:
-        webbrowser.open(url)
+        webbrowser.open(url + ("installa.html" if first_time else ""))
     except Exception:
         pass
-    while True:
-        try:
-            run_once(cfg, commands=False)
-        except Exception:
-            logging.exception("Ciclo fallito, riprovo al prossimo giro")
-        time.sleep(minutes * 60)
+    srv.serve_forever()
 
 
 def serve(cfg: dict, port: int) -> None:

@@ -23,6 +23,7 @@ DEFAULTS = {
         "ultima_chiamata_minuti": 45, "includi": [], "escludi": [],
     },
     "dashboard": {"cartella": "site", "ore_max": 48},
+    "browser": {"pagine": 4},
 }
 
 

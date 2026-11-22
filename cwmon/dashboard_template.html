@@ -13,7 +13,7 @@
     --sans: ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:radial-gradient(1200px 500px at 10% -10%,#3a1220 0,transparent 60%),var(--bg);
+  body{margin:0;min-height:100vh;background:radial-gradient(1200px 500px at 10% -10%,#3a1220 0,transparent 60%),var(--bg);
        color:var(--ink);font:14px/1.45 var(--sans)}
   header{padding:28px 28px 8px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px;justify-content:space-between}
   h1{font:600 30px/1.1 var(--serif);margin:0;letter-spacing:.2px}
@@ -78,7 +78,10 @@
     <h1>Cantina <span>Radar</span></h1>
     <div class="sub">Aste di vino su Catawiki confrontate con il valore di mercato · <span id="updated"></span></div>
   </div>
-  <div class="sub" id="settings"></div>
+  <div style="text-align:right">
+    <a class="chip" id="install" href="installa.html" style="text-decoration:none;display:inline-block;margin-bottom:6px">🍷 Pulsante per Catawiki</a>
+    <div class="sub" id="settings"></div>
+  </div>
 </header>
 
 <section class="kpis" id="kpis"></section>
@@ -111,7 +114,7 @@
     </tr></thead>
     <tbody id="rows"></tbody>
   </table>
-  <div class="empty" id="empty" hidden>Nessun lotto con questi filtri.</div>
+  <div class="empty" id="empty" hidden></div>
 </main>
 
 <footer>
@@ -136,7 +139,8 @@ function left(end){
 const S = DATA.settings;
 let sortK = "d", asc = false, onlyVal = true, onlyRes = false;
 
-$("#updated").textContent = "aggiornato " + new Date(DATA.generated*1000).toLocaleString("it-IT",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+$("#updated").textContent = "ultimo aggiornamento " + new Date(DATA.generated*1000).toLocaleString("it-IT",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+if (location.protocol === "file:" || location.hostname.endsWith("github.io")) $("#install").hidden = true;
 $("#settings").textContent = `Soglia avvisi: sconto ≥ ${pct(S.sconto_minimo)} · affidabilità ≥ ${pct(S.affidabilita_minima)} · entro ${S.ore_alla_chiusura}h`;
 [...new Set(DATA.lots.map(l => l.cat).filter(Boolean))].sort().forEach(c => $("#cat").insertAdjacentHTML("beforeend", `<option>${esc(c)}</option>`));
 $("#onlyVal").classList.toggle("on", onlyVal);
@@ -166,6 +170,9 @@ function render(){
     if(typeof x === "string") return asc ? x.localeCompare(y) : y.localeCompare(x);
     return asc ? x - y : y - x; });
   $("#empty").hidden = rows.length > 0;
+  $("#empty").innerHTML = DATA.lots.length ? "Nessun lotto con questi filtri." :
+    'Ancora nessun lotto. Apri le aste di vino su Catawiki e premi il pulsante <b>🍷 Cantina Radar</b> nei preferiti ' +
+    '(<a href="installa.html" style="color:var(--gold)">come installarlo</a>).';
   $("#rows").innerHTML = rows.slice(0, 500).map(l => {
     const hot = l.d != null && l.d >= S.sconto_minimo && l.c >= S.affidabilita_minima;
     const dc = l.d == null ? "" : l.d >= S.sconto_minimo ? "g" : l.d >= 0 ? "m" : "b";
@@ -175,7 +182,7 @@ function render(){
       (l.rs && l.rm === 0) ? `<span class="tag warn">riserva non raggiunta</span>` : "",
       l.elo ? `<span class="tag">stima ${eur(l.elo)}–${eur(l.ehi)}</span>` : ""].join("");
     return `<tr class="${hot?"hot":""}">
-      <td class="img">${l.img ? `<img class="thumb" loading="lazy" src="${esc(l.img)}" alt="">` : `<div class="thumb"></div>`}</td>
+      <td class="img">${l.img ? `<img class="thumb" loading="lazy" src="${esc(l.img)}" alt="" onerror="this.style.visibility='hidden'">` : `<div class="thumb"></div>`}</td>
       <td class="t"><a href="${esc(l.u)}" target="_blank" rel="noopener">${esc(l.t)}</a>
         <div class="meta">${esc(l.cat)} ${tags}</div></td>
       <td data-l="Chiusura" class="${soon?"soon":""}">${left(l.end)}</td>

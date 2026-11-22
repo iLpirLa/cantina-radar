@@ -14,6 +14,29 @@ from .valuation import Valuator, load_references
 log = logging.getLogger(__name__)
 
 
+PAESI = {"italia": "Italia", "spagna": "Spagna"}
+
+
+def effective_costs(cfg: dict, db: DB | None = None) -> dict:
+    """Costi attivi: commissione + spedizione del paese scelto (config.yaml, modificabile dalla dashboard)."""
+    c = dict(cfg["costi"])
+    ov = (db.get("overrides", {}) or {}) if db is not None else {}
+    table = {k: dict(v) for k, v in (c.get("spedizione") or {}).items()}
+    for paese, vals in (ov.get("spedizione") or {}).items():
+        table.setdefault(paese, {}).update(vals)
+    for paese in PAESI:
+        table.setdefault(paese, {"lotto": c.get("spedizione_lotto", 25.0),
+                                 "extra_bottiglia": c.get("spedizione_extra_bottiglia", 2.0)})
+    paese = ov.get("paese") or c.get("paese") or "italia"
+    if paese not in table:
+        paese = "italia"
+    c["paese"] = paese
+    c["spedizione"] = table
+    c["spedizione_lotto"] = float(table[paese]["lotto"])
+    c["spedizione_extra_bottiglia"] = float(table[paese]["extra_bottiglia"])
+    return c
+
+
 def effective_alert_cfg(cfg: dict, db: DB) -> dict:
     a = dict(cfg["avvisi"])
     a.update(db.get("overrides", {}) or {})
@@ -70,7 +93,7 @@ def collect(cfg: dict, db: DB, client: CatawikiClient) -> dict:
 def score_all(cfg: dict, db: DB) -> Valuator:
     refs = load_references(Path(cfg["_root"]) / cfg["valutazione"]["file_riferimenti"])
     vivino = {(r["wine_key"], r["vintage"]): dict(r) for r in db.conn.execute("SELECT * FROM vivino")}
-    val = Valuator(refs, db.history(int(cfg["valutazione"]["giorni_storico"])), cfg["costi"],
+    val = Valuator(refs, db.history(int(cfg["valutazione"]["giorni_storico"])), effective_costs(cfg, db),
                    float(cfg["valutazione"]["match_minimo"]), vivino)
     target = float(effective_alert_cfg(cfg, db)["sconto_minimo"])
     for lot in db.open_lots():
@@ -124,7 +147,7 @@ def send_alerts(cfg: dict, db: DB, tg: Telegram) -> int:
         buttons = [("Apri su Catawiki", lot_url(r["id"], r["slug"], loc))]
         if cfg.get("dashboard_url"):
             buttons.append(("Dashboard", cfg["dashboard_url"]))
-        res = tg.send(alert_text(r, s, kind), buttons)
+        res = tg.send(alert_text(r, s, kind, effective_costs(cfg, db)), buttons)
         if res is None and tg.enabled:
             continue
         db.mark_alerted(r["id"], kind, r["discount"])

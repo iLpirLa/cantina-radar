@@ -172,11 +172,29 @@ def update_settings(cfg: dict, db: DB, data: dict) -> dict:
                 pass
     if "pausa" in data:
         ov["pausa"] = bool(data["pausa"])
+    from .monitor import PAESI
+    if data.get("paese") in PAESI:
+        ov["paese"] = data["paese"]
+    if isinstance(data.get("spedizione"), dict):
+        sped = ov.get("spedizione") or {}
+        for paese, vals in data["spedizione"].items():
+            if paese in PAESI and isinstance(vals, dict):
+                cur = sped.get(paese, {})
+                for k in ("lotto", "extra_bottiglia"):
+                    try:
+                        cur[k] = min(1000.0, max(0.0, float(vals[k])))
+                    except (KeyError, TypeError, ValueError):
+                        pass
+                sped[paese] = cur
+        ov["spedizione"] = sped
     db.set("overrides", ov)
     score_all(cfg, db)  # l'offerta massima dipende dallo sconto minimo
     build(cfg, db)
     a = effective_alert_cfg(cfg, db)
-    return {k: a.get(k) for k in list(SETTINGS_KEYS) + ["pausa"]}
+    from .monitor import effective_costs
+    out = {k: a.get(k) for k in list(SETTINGS_KEYS) + ["pausa"]}
+    out["costi"] = effective_costs(cfg, db)
+    return out
 
 
 def add_reference(cfg: dict, db: DB, data: dict) -> dict:

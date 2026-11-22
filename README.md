@@ -13,14 +13,15 @@ Valuta le aste di vino, Champagne e vini dolci che stai guardando su Catawiki e 
 
 ## La dashboard
 
-- **Il tuo obiettivo** (in alto): sconto minimo che cerchi, punteggio Vivino minimo, offerta massima e finestra per gli avvisi. Quando premi **Salva obiettivo**, valgono sia per la dashboard sia per Telegram.
+- **Il tuo obiettivo** (in alto): sconto minimo che cerchi, punteggio Vivino minimo, offerta massima, finestra per gli avvisi e **paese di spedizione** (Italia o Spagna), con il costo stimato per lotto e per bottiglia. Quando premi **Salva obiettivo**, valgono sia per la dashboard sia per Telegram.
+- **Filtri**: ricerca libera, **tipologia** (rosso, bianco, rosato, spumante, dolce e fortificato: ricavata dal titolo), **annata** da… a…, ordinamento e "Nascondi distillati".
 - **🔥 Occasioni**: le aste che rispettano il tuo obiettivo.
 - **Tutti i lotti**: ogni lotto letto, con il giudizio (*Affare*, *Interessante*, *Prezzo di mercato*, *Sopra il mercato*).
 - **Da valutare**: i vini di cui l'app non conosce ancora il valore. Scrivi il prezzo a bottiglia direttamente lì: c'è il link per cercarlo su Wine-Searcher e Vivino. Viene salvato in `riferimenti.csv` e usato anche per le aste future.
 - **Storico vendite**: le aste chiuse registrate, più un riquadro per importare un tuo CSV di vendite passate.
 - **Come funziona**: la spiegazione di ogni voce.
 
-Ogni lotto dice in parole quanto ti costerebbe a bottiglia, quanto vale e **fino a che offerta conviene salire** per restare nel tuo sconto.
+Per ogni lotto la colonna di destra mostra il conto completo: offerta + commissione Catawiki (9% + 3 €) + spedizione verso il tuo paese = totale, diviso per le bottiglie, contro il valore di mercato. Sotto c'è **fino a che offerta conviene salire** per restare nel tuo sconto.
 
 ## Punteggi dei vini
 
@@ -116,7 +117,7 @@ Gli avvisi partono quando premi il pulsante e trovi lotti sopra soglia che chiud
 
 I parametri principali (sono tutti commentati nel file):
 - `categories`: 443 Vino, 961 Champagne, 971 Porto e vini dolci (437 Whisky disponibile ma il parser è pensato per il vino)
-- `spedizione_lotto`: la spedizione verso di te (default 25 €). Controlla sempre la cifra reale sulla pagina del lotto
+- `paese` e `spedizione`: paese di consegna e costo stimato per lotto e per bottiglia in più, per Italia e Spagna (default 25 € + 2 €). Si cambiano anche dalla dashboard. Controlla sempre la cifra reale sulla pagina del lotto
 - `sconto_minimo`, `ore_alla_chiusura`, `affidabilita_minima`, `budget_massimo`
 - `includi` / `escludi`: parole chiave (es. `includi: ["barolo", "brunello", "bordeaux"]`)
 

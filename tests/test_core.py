@@ -357,3 +357,33 @@ def test_litri_and_normalize_existing(tmp_path):
     assert jd["category_id"] == 437
     assert bq["title"] == "2023 Domaine de Baronarques Chardonnay - Languedoc - 6 Bottiglie (0,75 L)"
     assert bq["category_id"] == 443 and bq["bottles"] == 6 and bq["parse_ok"] == 1
+
+
+@pytest.mark.parametrize("title,exp", [
+    ("2023 Domaine de Baronarques Chardonnay - Languedoc - 6 Bottiglie (0,75 L)", "bianco"),
+    ("2016 Caymus, Cabernet Sauvignon - Napa Valley - 1 Bottle (0.75L)", "rosso"),
+    ("2017 Cantine Ferrari, Perlè Bianco - Trentino Alto Adige Blanc de Blancs - 3 Bottiglie (0,75 L)", "spumante"),
+    ("2000 Château d'Yquem - Sauternes - 1 Bottle (0.75L)", "dolce"),
+    ("2016 Domaine Ott, Clos Mireille Rosé - Côtes de Provence - 6 Bottles (0.75L)", "rosato"),
+    ("2015 Domaine de Chevalier - Pessac-Léognan - 1 Bottle (0.75L)", "rosso"),
+    ("2019 Foo - Vin de France - 1 Bottle (0.75L)", ""),
+])
+def test_wine_type(title, exp):
+    from cwmon.parser import wine_type
+    assert wine_type(title) == exp
+
+
+def test_country_shipping(tmp_path):
+    from cwmon.monitor import effective_costs
+    from cwmon.server import update_settings
+    cfg = load_config()
+    cfg["db_path"] = str(tmp_path / "c.db")
+    cfg["dashboard"]["cartella"] = str(tmp_path / "site")
+    db = DB(cfg["db_path"])
+    assert effective_costs(cfg, db)["paese"] == "italia"
+    out = update_settings(cfg, db, {"paese": "spagna", "spedizione": {"spagna": {"lotto": 35, "extra_bottiglia": 3}}})
+    c = effective_costs(cfg, db)
+    assert c["paese"] == "spagna" and c["spedizione_lotto"] == 35 and c["spedizione_extra_bottiglia"] == 3
+    assert c["spedizione"]["italia"]["lotto"] == 25 and out["costi"]["paese"] == "spagna"
+    total, per = lot_cost(100, 2.0, 2, c)
+    assert total == pytest.approx(100 * 1.09 + 3 + 35 + 3)

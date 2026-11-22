@@ -67,6 +67,15 @@
   .lbl{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
   .g{color:var(--good)} .o{color:var(--ok)} .b{color:var(--bad)} .m{color:var(--mute)}
   .explain{font-size:14px;color:var(--mute)} .explain b{color:var(--ink);font-weight:600}
+  .calc{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13.5px}
+  .calc .r{display:flex;justify-content:space-between;gap:10px;padding:2px 0;color:var(--mute)}
+  .calc .r span:last-child{color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .calc .tot{border-top:1px solid var(--line);margin-top:3px;padding-top:5px;font-weight:600}
+  .calc .tot span{color:var(--ink)}
+  .calc .pb span:last-child{color:var(--gold);font-weight:600}
+  .calc .mv{border-top:1px dashed var(--line);margin-top:3px;padding-top:5px}
+  .calc .op{display:inline-block;width:14px;color:var(--faint)}
+  .tools .yr{width:84px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 8px}
   .maxbid{background:var(--panel2);border-radius:10px;padding:8px 10px;font-size:14px}
   .maxbid b{color:var(--gold);font-size:16px}
   .src{font-size:12px;color:var(--faint)}
@@ -124,8 +133,11 @@
       <option value="0">qualsiasi</option><option value="3.8">almeno 3,8</option><option value="4">almeno 4,0</option>
       <option value="4.2">almeno 4,2</option><option value="4.4">almeno 4,4</option></select>
     e <b>offerta fino a</b> <input id="gBudget" type="number" min="0" step="10" placeholder="∞"> €.
-    Avvisami su Telegram per le aste che chiudono entro <input id="gHours" type="number" min="1" max="72" step="1"> ore.
+    Avvisami su Telegram per le aste che chiudono entro <input id="gHours" type="number" min="1" max="72" step="1"> ore.<br>
+    Spedizione verso <select id="gCountry"></select>: circa <input id="gShip" type="number" min="0" step="1"> € a lotto
+    + <input id="gShipX" type="number" min="0" step="0.5"> € per ogni bottiglia in più.
   </p>
+  <div class="src">La spedizione è una stima: il costo reale dipende dal venditore ed è indicato sulla pagina del lotto. Puoi impostare un valore diverso per ogni paese.</div>
   <div class="row2">
     <button class="btn primary small" id="gSave">Salva obiettivo</button>
     <span class="saved" id="gSaved"></span>
@@ -155,6 +167,10 @@ Punteggi da Vivino (community, scala 1–5). Commissione Catawiki 9% + 3 €.</f
       <option value="rating">Punteggio più alto</option>
       <option value="bid">Offerta più bassa</option>
     </select>
+    <select id="type" title="Tipologia"><option value="">Tutte le tipologie</option></select>
+    <span class="meta">Annata</span>
+    <input class="yr" type="number" id="yFrom" placeholder="dal" min="1850" max="2100">
+    <input class="yr" type="number" id="yTo" placeholder="al" min="1850" max="2100">
     <label class="toggle"><input type="checkbox" id="noSpirits" checked> Nascondi distillati</label>
   </div>
 </template>
@@ -169,7 +185,7 @@ const now = () => Date.now() / 1000;
 const LIVE = location.protocol.startsWith("http") && !location.hostname.endsWith("github.io");
 const SPIRITS = new Set(["Whisky", "Distillati"]);
 let tab = new URLSearchParams(location.search).get("tab") || "deals";
-const ui = { q: "", sort: "best", noSpirits: true };
+const ui = { q: "", sort: "best", noSpirits: true, type: "", yFrom: "", yTo: "" };
 
 function left(end) {
   if (!end) return "chiusura sconosciuta";
@@ -199,6 +215,9 @@ function isDeal(l) {
 }
 function baseFilter(l) {
   if (ui.noSpirits && SPIRITS.has(l.cat)) return false;
+  if (ui.type && (l.ty || "") !== (ui.type === "nd" ? "" : ui.type)) return false;
+  if (ui.yFrom && (!l.v || l.v < +ui.yFrom)) return false;
+  if (ui.yTo && (!l.v || l.v > +ui.yTo)) return false;
   if (ui.q) { const q = ui.q.toLowerCase(); if (!((l.t || "").toLowerCase().includes(q) || String(l.v || "").includes(q))) return false; }
   return true;
 }
@@ -226,12 +245,29 @@ function refForm(l) {
     <span class="src">Cerca il prezzo: ${searchLinks(l)}</span>
   </form>`;
 }
+function costCalc(l) {
+  const C = DATA.costs, bid = l.bid || 0, bt = l.bt || 1, eq = l.eq || 0;
+  const fee = bid * C.commissione_pct + C.commissione_fissa;
+  const ship = C.spedizione_lotto + Math.max(0, bt - 1) * C.spedizione_extra_bottiglia;
+  const tot = bid + fee + ship;
+  const paese = (DATA.paesi || {})[C.paese] || C.paese;
+  const e2 = v => "€ " + v.toLocaleString("it-IT", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const rows = [
+    `<div class="r"><span><span class="op"></span>Offerta attuale</span><span>${e2(bid)}</span></div>`,
+    `<div class="r" title="Buyer Protection: ${Math.round(C.commissione_pct * 100)}% dell'offerta + ${e2(C.commissione_fissa)}"><span><span class="op">+</span>Commissione Catawiki (${Math.round(C.commissione_pct * 100)}% + ${e2(C.commissione_fissa)})</span><span>${e2(Math.round(fee * 100) / 100)}</span></div>`,
+    `<div class="r" title="Stima modificabile nel riquadro 'Il tuo obiettivo'"><span><span class="op">+</span>Spedizione stimata (${esc(paese)}${bt > 1 ? `, ${bt} bott.` : ""})</span><span>${e2(ship)}</span></div>`,
+    `<div class="r tot"><span><span class="op">=</span>Totale da pagare</span><span>${e2(Math.round(tot))}</span></div>`,
+  ];
+  if (eq) rows.push(`<div class="r pb"><span><span class="op">÷</span>${String(eq).replace(".", ",")} bottiglie da 0,75 L</span><span>${eur(tot / eq)} a bottiglia</span></div>`);
+  if (l.mv != null) rows.push(`<div class="r mv"><span><span class="op"></span>Valore di mercato</span><span>${eur(l.mv)} a bottiglia</span></div>`);
+  return `<div class="calc">${rows.join("")}</div>`;
+}
 function lotCard(l) {
   const v = verdict(l), soon = l.end && l.end - now() < 3600;
   const chips = [
     l.v ? `<span class="chip">${l.v}</span>` : "",
     l.bt ? `<span class="chip">${l.bt} ${l.bt === 1 ? "bottiglia" : "bottiglie"}${l.eq && l.eq !== l.bt ? ` (= ${String(l.eq).replace(".", ",")} da 0,75 L)` : ""}</span>` : "",
-    l.cat ? `<span class="chip">${esc(l.cat)}</span>` : "",
+    l.ty ? `<span class="chip">${esc((DATA.wine_types || {})[l.ty] || l.ty)}</span>` : (l.cat && SPIRITS.has(l.cat) ? `<span class="chip">${esc(l.cat)}</span>` : ""),
     l.rt ? `<a class="chip star" href="${esc(l.ru || "#")}" target="_blank" rel="noopener" title="Valutazione media degli utenti Vivino">★ ${l.rt.toFixed(1).replace(".", ",")} Vivino${l.rc ? ` · ${l.rc.toLocaleString("it-IT")} voti` : ""}</a>` : "",
     l.cs ? `<span class="chip critic" title="Punteggio della critica inserito da te">✎ ${esc(l.cs)}</span>` : "",
     l.mix ? `<span class="chip warn">lotto misto</span>` : "",
@@ -240,12 +276,14 @@ function lotCard(l) {
   let right;
   if (l.d == null) {
     right = `<div class="vhead"><span class="lbl m">Valore di mercato sconosciuto</span></div>
+      ${costCalc(l)}
       <div class="explain">Quanto vale una bottiglia di questo vino? Inseriscilo e l'app calcola subito lo sconto, anche per le aste future.</div>
       ${refForm(l)}`;
   } else {
     const mbOk = l.mb != null && l.mb > (l.bid || 0);
-    right = `<div class="vhead"><span class="pct ${v.cls}">${pct(l.d)}</span><span class="lbl ${v.cls}">${v.lbl}</span></div>
-      <div class="explain">Ti costerebbe <b>${eur(l.cpb)}</b> a bottiglia (offerta + commissione + spedizione), contro un valore di mercato di circa <b>${eur(l.mv)}</b>.</div>
+    right = `<div class="vhead"><span class="pct ${v.cls}">${pct(l.d)}</span><span class="lbl ${v.cls}">${v.lbl}</span>
+        <span class="src">${l.d > 0 ? "rispetto al valore di mercato" : l.d < 0 ? "più del valore di mercato" : ""}</span></div>
+      ${costCalc(l)}
       <div class="maxbid">${mbOk ? `Per avere almeno il ${goalPct()}% di sconto: <b>offri al massimo ${eur(l.mb)}</b>`
         : `L'offerta attuale è già oltre il limite per avere il ${goalPct()}% di sconto`}</div>
       <div class="src">Valore da: ${esc(l.src)} · affidabilità ${confLbl(l.c)}</div>
@@ -284,7 +322,18 @@ function renderList(rows, empty, hint) {
   v.appendChild($("#tplTools").content.cloneNode(true));
   if (hint) v.insertAdjacentHTML("beforeend", `<p class="hint">${hint}</p>`);
   v.insertAdjacentHTML("beforeend", `<div id="list"></div>`);
+  const TY = DATA.wine_types || {};
+  const present = new Set(DATA.lots.filter(isOpen).map(l => l.ty || ""));
+  ["rosso", "bianco", "rosato", "spumante", "dolce", ""].forEach(k => {
+    if (!present.has(k)) return;
+    const n = DATA.lots.filter(l => isOpen(l) && (l.ty || "") === k && !(ui.noSpirits && SPIRITS.has(l.cat))).length;
+    $("#type").insertAdjacentHTML("beforeend", `<option value="${k || "nd"}">${esc(TY[k] || k)} (${n})</option>`);
+  });
   $("#q").value = ui.q; $("#sort").value = ui.sort; $("#noSpirits").checked = ui.noSpirits;
+  $("#type").value = ui.type; $("#yFrom").value = ui.yFrom; $("#yTo").value = ui.yTo;
+  $("#type").onchange = e => { ui.type = e.target.value; refreshList(); };
+  $("#yFrom").oninput = e => { ui.yFrom = e.target.value; refreshList(); };
+  $("#yTo").oninput = e => { ui.yTo = e.target.value; refreshList(); };
   $("#q").oninput = e => { ui.q = e.target.value; refreshList(); };
   $("#sort").onchange = e => { ui.sort = e.target.value; refreshList(); };
   $("#noSpirits").onchange = e => { ui.noSpirits = e.target.checked; refreshList(); };
@@ -348,7 +397,7 @@ function renderHelp() {
   $("#view").innerHTML = `<div class="card"><h3>Come leggere un lotto</h3><dl>
     <dt>Sconto (es. −38%)</dt><dd>Quanto risparmieresti rispetto al valore di mercato se vincessi all'offerta attuale, già al netto di commissione e spedizione. <b>+12%</b> significa che pagheresti il 12% in più del suo valore.</dd>
     <dt>Affare, Interessante…</dt><dd><b>Affare</b>: sconto pari o superiore al tuo obiettivo. <b>Interessante</b>: almeno metà del tuo obiettivo. <b>Prezzo di mercato</b>: più o meno quanto vale. <b>Sopra il mercato</b>: costa più di quanto vale.</dd>
-    <dt>Costo a bottiglia</dt><dd>Offerta + commissione Catawiki (9% + 3 €) + spedizione stimata (${eur(DATA.costs.spedizione_lotto)} a lotto, modificabile in <code>config.yaml</code>), diviso per le bottiglie da 0,75 L. Una magnum conta come 2.</dd>
+    <dt>Costo a bottiglia</dt><dd>Offerta + commissione Catawiki (9% + 3 €) + spedizione stimata verso il paese scelto (${eur(DATA.costs.spedizione_lotto)} a lotto + ${eur(DATA.costs.spedizione_extra_bottiglia)} per ogni bottiglia in più, modificabile nel riquadro "Il tuo obiettivo"), diviso per le bottiglie da 0,75 L. Una magnum conta come 2.</dd>
     <dt>Valore di mercato</dt><dd>Quanto vale una bottiglia. Fonti, dalla più affidabile: i prezzi che inserisci tu, lo storico delle aste Catawiki chiuse, il prezzo Vivino, la stima dell'esperto Catawiki.</dd>
     <dt>Affidabilità</dt><dd>Quanto è solida la stima del valore. <b>Alta</b> se viene da un tuo prezzo o da più vendite simili, <b>bassa</b> se si basa su un solo dato indiretto. Le occasioni richiedono almeno un'affidabilità media.</dd>
     <dt>Offri al massimo</dt><dd>L'offerta oltre la quale lo sconto scende sotto il tuo obiettivo. È il numero da tenere a mente quando rilanci negli ultimi minuti.</dd>
@@ -385,11 +434,19 @@ function fillGoal() {
   $("#gRate").value = String(s.punteggio_minimo || 0);
   $("#gBudget").value = s.budget_massimo || "";
   $("#gHours").value = s.ore_alla_chiusura;
+  const C = DATA.costs, P = DATA.paesi || { italia: "Italia", spagna: "Spagna" };
+  $("#gCountry").innerHTML = Object.entries(P).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+  $("#gCountry").value = C.paese;
+  const showShip = k => { const t = (C.spedizione || {})[k] || {}; $("#gShip").value = t.lotto ?? C.spedizione_lotto; $("#gShipX").value = t.extra_bottiglia ?? C.spedizione_extra_bottiglia; };
+  showShip(C.paese);
+  $("#gCountry").onchange = e => showShip(e.target.value);
   if (!LIVE) { $("#gSave").disabled = true; $("#gSaved").textContent = "Modificabile solo con l'app aperta sul computer."; }
 }
 $("#gSave").onclick = async () => {
   const r = await api("/api/settings", { sconto_minimo: (+$("#gDisc").value || 0) / 100, punteggio_minimo: +$("#gRate").value,
-    budget_massimo: +$("#gBudget").value || 0, ore_alla_chiusura: +$("#gHours").value || 3 });
+    budget_massimo: +$("#gBudget").value || 0, ore_alla_chiusura: +$("#gHours").value || 3,
+    paese: $("#gCountry").value,
+    spedizione: { [$("#gCountry").value]: { lotto: +$("#gShip").value || 0, extra_bottiglia: +$("#gShipX").value || 0 } } });
   if (!r.error) await reload();
   $("#gSaved").textContent = r.error ? "Errore: " + r.error : "✓ Salvato: vale per la dashboard e per gli avvisi Telegram";
   setTimeout(() => $("#gSaved").textContent = "", 5000);
@@ -414,7 +471,7 @@ document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
 });
 header(); fillGoal(); render();
 if (LIVE) setInterval(() => {
-  const busy = document.querySelector("form.refform input:focus, #csv:focus, .goal input:focus, .goal select:focus, details[open]");
+  const busy = document.querySelector("form.refform input:focus, #csv:focus, .goal input:focus, .goal select:focus, details[open], .tools input:focus");
   if (!busy) reload();
 }, 30000);
 </script>

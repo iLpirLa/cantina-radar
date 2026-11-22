@@ -14,7 +14,9 @@ DEFAULTS = {
     },
     "costi": {
         "commissione_pct": 0.09, "commissione_fissa": 3.0,
-        "spedizione_lotto": 25.0, "spedizione_extra_bottiglia": 2.0,
+        "paese": "italia",
+        "spedizione": {"italia": {"lotto": 25.0, "extra_bottiglia": 2.0},
+                       "spagna": {"lotto": 25.0, "extra_bottiglia": 2.0}},
     },
     "valutazione": {"file_riferimenti": "riferimenti.csv", "match_minimo": 88, "giorni_storico": 365},
     "avvisi": {

@@ -6,7 +6,8 @@ import time
 from pathlib import Path
 
 from .db import DB
-from .monitor import effective_alert_cfg
+from .monitor import effective_alert_cfg, effective_costs, PAESI
+from .parser import wine_type, WINE_TYPES
 from .telegram import lot_url
 
 CATEGORIES = {443: "Vino", 961: "Champagne", 971: "Porto e dolci", 437: "Whisky", 965: "Distillati",
@@ -33,9 +34,11 @@ def build(cfg: dict, db: DB, out_dir: str | Path | None = None) -> Path:
             "c": r["confidence"], "src": r["value_source"], "mb": r["max_bid"],
             "pr": r["producer"], "cu": r["cuvee"], "ap": r["appellation"], "ok": r["parse_ok"],
             "rt": r["rating"], "rc": r["rating_count"], "ru": r["rating_url"], "cs": r["critic_score"],
+            "ty": wine_type(r["title"] or "", r["category_id"]),
         })
     history = []
-    fee, fix = cfg["costi"]["commissione_pct"], cfg["costi"]["commissione_fissa"]
+    costs = effective_costs(cfg, db)
+    fee, fix = costs["commissione_pct"], costs["commissione_fissa"]
     for r in db.sold_history():
         history.append({
             "id": r["id"], "t": r["title"], "u": lot_url(r["id"], r["slug"], loc) if r["id"] > 0 else None,
@@ -48,7 +51,7 @@ def build(cfg: dict, db: DB, out_dir: str | Path | None = None) -> Path:
         "settings": {"sconto_minimo": a["sconto_minimo"], "affidabilita_minima": a["affidabilita_minima"],
                      "ore_alla_chiusura": a["ore_alla_chiusura"], "punteggio_minimo": a.get("punteggio_minimo") or 0,
                      "budget_massimo": a.get("budget_massimo") or 0, "pausa": bool(a.get("pausa"))},
-        "costs": cfg["costi"],
+        "costs": costs, "paesi": PAESI, "wine_types": WINE_TYPES,
         "lots": lots,
         "history": history,
         "vivino_blocked": bool(db.get("vivino_bloccato")),

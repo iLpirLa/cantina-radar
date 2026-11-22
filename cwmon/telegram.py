@@ -86,12 +86,20 @@ def lot_url(lot_id: int, slug: str | None, locale: str) -> str:
     return f"https://www.catawiki.com/{locale}/l/{lot_id}" + (f"-{slug}" if slug else "")
 
 
-def alert_text(lot, s: dict, kind: str) -> str:
+def alert_text(lot, s: dict, kind: str, costs: dict | None = None) -> str:
     head = "⏰ <b>ULTIMA CHIAMATA</b>" if kind == "last_call" else "🍷 <b>Occasione</b>"
     end_local = "?"
     if lot["end_time"]:
         dt = datetime.fromtimestamp(lot["end_time"], ROME)
         end_local = dt.strftime("%H:%M") if dt.date() == datetime.now(ROME).date() else dt.strftime("%d/%m %H:%M")
+    breakdown = ""
+    if costs and lot["current_bid"] is not None and lot["bottle_eq"]:
+        bid = float(lot["current_bid"] or 0)
+        fee = bid * costs["commissione_pct"] + costs["commissione_fissa"]
+        ship = costs["spedizione_lotto"] + max(0, (lot["bottles"] or 1) - 1) * costs["spedizione_extra_bottiglia"]
+        paese = str(costs.get("paese", "")).capitalize()
+        breakdown = (f"Totale: {fmt_eur(bid)} + commissione {fmt_eur(fee)} + spedizione {paese} {fmt_eur(ship)} "
+                     f"= {fmt_eur(bid + fee + ship)}\n")
     rating = ""
     try:
         if lot["rating"]:
@@ -107,7 +115,8 @@ def alert_text(lot, s: dict, kind: str) -> str:
         f"{head} · sconto <b>{s['discount'] * 100:.0f}%</b>\n"
         f"<b>{html.escape(lot['title'] or '')}</b>\n\n"
         f"Offerta attuale: <b>{fmt_eur(lot['current_bid'])}</b> · chiude tra {time_left(lot['end_time'])} ({end_local})\n"
-        f"Costo reale/bott.: {fmt_eur(s['cost_per_bottle'])} vs valore {fmt_eur(s['market_per_bottle'])}\n"
+        f"{breakdown}"
+        f"Costo a bottiglia: <b>{fmt_eur(s['cost_per_bottle'])}</b> · valore di mercato {fmt_eur(s['market_per_bottle'])}\n"
         f"💡 Offri al massimo <b>{fmt_eur(s['max_bid'])}</b> per restare nel tuo sconto minimo\n"
         f"{rating}"
         f"Fonte valore: {html.escape(s['value_source'])} · affidabilità {s['confidence'] * 100:.0f}%"

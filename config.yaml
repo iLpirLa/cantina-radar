@@ -25,10 +25,14 @@ costi:
   # Commissione acquirente Catawiki (Buyer Protection): 9% + 3 € per lotto
   commissione_pct: 0.09
   commissione_fissa: 3.0
-  # Spedizione stimata per lotto verso di te (€). La spedizione reale è indicata sulla pagina del lotto.
-  spedizione_lotto: 25.0
-  # Supplemento per ogni bottiglia oltre la prima (€)
-  spedizione_extra_bottiglia: 2.0
+  # Paese di consegna: italia o spagna (si cambia anche dalla dashboard)
+  paese: italia
+  # Spedizione stimata per paese: costo per lotto + supplemento per ogni bottiglia oltre la prima (€).
+  # La spedizione reale dipende dal venditore ed è indicata sulla pagina del lotto.
+  # Questi valori si possono modificare anche dalla dashboard, nel riquadro "Il tuo obiettivo".
+  spedizione:
+    italia: {lotto: 25.0, extra_bottiglia: 2.0}
+    spagna: {lotto: 25.0, extra_bottiglia: 2.0}
 
 valutazione:
   # File con i tuoi prezzi di riferimento (prezzo per bottiglia 0,75 L)

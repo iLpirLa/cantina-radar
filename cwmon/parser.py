@@ -220,3 +220,58 @@ def parse_title(title: str, slug: str = "") -> ParsedTitle:
     p.wine_key = "|".join(key_bits)
     p.ok = bool(p.producer) and p.bottle_eq > 0 and not p.mixed
     return p
+
+
+# ---------------------------------------------------------------- tipologia
+_TYPE_RULES = [
+    ("spumante", r"champagne|franciacorta|cava\b|prosecco|cr[eé]mant|spumante|sekt|trento ?doc|metodo classico|"
+                 r"blanc de (?:blancs|noirs)|extra brut|\bbrut\b|pas dos[eé]|dosage z[eé]ro|p[eé]tillant|lambrusco|"
+                 r"dom p[eé]rignon|krug|cristal|bollinger|ruinart|taittinger|perl[eè]"),
+    ("dolce", r"\bport\b|porto|sauternes|barsac|tokaj|passito|recioto|vin santo|vinsanto|madeira|sherry|jerez|"
+              r"marsala|beerenauslese|trockenbeerenauslese|\btba\b|eiswein|ice ?wine|auslese|moscato|muscat|"
+              r"banyuls|maury|rivesaltes|pedro xim[eé]nez|\bpx\b|vendanges tardives|s[eé]lection de grains nobles|"
+              r"yquem|late harvest|sweet"),
+    ("rosato", r"\bros[eé]\b|rosato|rosado|cerasuolo|chiaretto|tavel"),
+    ("bianco", r"chardonnay|sauvignon blanc|\bsauvignon\b|riesling|chablis|meursault|montrachet|corton[- ]charlemagne|"
+               r"pouilly|sancerre|gew[uü]rztraminer|pinot (?:grigio|gris|blanc|bianco)|vermentino|soave|gr[uü]ner|"
+               r"weissburgunder|wei[sß]burgunder|albari[nñ]o|verdicchio|fiano|greco di tufo|timorasso|trebbiano|"
+               r"chenin|viognier|condrieu|vouvray|savenni[eè]res|semillon|s[eé]millon|marsanne|roussanne|godello|"
+               r"verdejo|friulano|ribolla|kerner|silvaner|m[uü]ller|\bbianco\b|\bblanc\b|\bweiss\b|\bwhite\b|"
+               r"\bblanco\b|\bbranco\b"),
+    # vitigni e colori rossi: decisivi
+    ("rosso_forte", r"malbec|cabernet|merlot|pinot noir|pinot nero|sp[aä]tburgunder|syrah|shiraz|nebbiolo|sangiovese|"
+                    r"zinfandel|montepulciano|aglianico|primitivo|nero d.avola|lagrein|teroldego|barbera|dolcetto|"
+                    r"grenache|garnacha|tempranillo|carm[eé]n[eè]re|cannonau|refosco|sagrantino|corvina|"
+                    r"\brosso\b|\brouge\b|\btinto\b|\bred\b|\brot\b"),
+    # zone tipicamente rosse: contano solo se non c'è un vitigno o colore bianco
+    ("rosso", r"barolo|barbaresco|brunello|chianti|bolgheri|sassicaia|tignanello|ornellaia|amarone|valpolicella|"
+              r"pauillac|margaux|saint[- ]julien|saint[- ]est[eè]phe|pomerol|saint[- ][eé]milion|pessac|graves|"
+              r"m[eé]doc|bordeaux|pommard|volnay|nuits|gevrey|vosne|chambolle|morey|clos de vougeot|beaune|"
+              r"c[oô]te[- ]r[oô]tie|hermitage|cornas|ch[aâ]teauneuf|gigondas|vacqueyras|rioja|ribera|priorat|toro\b|"
+              r"taurasi|langhe|roero|ghemme|gattinara|etna|morellino|vino nobile|bourgogne|burgundy|toscana|"
+              r"rodano|rh[oô]ne|languedoc|mendoza|napa|maremma"),
+]
+_TYPE_RES = [(t, re.compile(rx, re.I)) for t, rx in _TYPE_RULES]
+WINE_TYPES = {"rosso": "Rosso", "bianco": "Bianco", "rosato": "Rosato", "spumante": "Spumante",
+              "dolce": "Dolce e fortificato", "": "Non determinato"}
+
+
+def wine_type(title: str, category_id: int | None = None) -> str:
+    """Tipologia dedotta dal titolo: rosso, bianco, rosato, spumante, dolce ('' se non determinabile)."""
+    if category_id == 961:
+        return "spumante"
+    if category_id == 971:
+        return "dolce"
+    t = strip_accents(title or "")
+    # le parole del vitigno/colore pesano più della denominazione (es. "Langhe Chardonnay" = bianco)
+    for typ, rx in _TYPE_RES:
+        if typ in ("spumante", "dolce", "rosato") and rx.search(t):
+            return typ
+    rx = dict(_TYPE_RES)
+    if rx["rosso_forte"].search(t):
+        return "rosso"
+    if rx["bianco"].search(t):
+        return "bianco"
+    if rx["rosso"].search(t):
+        return "rosso"
+    return ""

@@ -36,8 +36,10 @@ class Telegram:
     def _call(self, method: str, **params):
         if not self.token:
             return None
+        # il long polling di getUpdates tiene aperta la connessione per "timeout" secondi
+        http_timeout = int(params.get("timeout") or 0) + 20
         try:
-            r = requests.post(f"https://api.telegram.org/bot{self.token}/{method}", json=params, timeout=40)
+            r = requests.post(f"https://api.telegram.org/bot{self.token}/{method}", json=params, timeout=http_timeout)
             data = r.json()
             if not data.get("ok"):
                 log.warning("Telegram %s: %s", method, data.get("description"))

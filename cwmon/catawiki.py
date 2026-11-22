@@ -84,7 +84,7 @@ class CatawikiClient:
         r = self._get(f"{BASE}/{self.locale}/c/{category_id}", params=params)
         if r.status_code == 403:
             raise RuntimeError(f"Catawiki ha rifiutato la richiesta (HTTP 403) per la categoria {category_id}: "
-                               "succede con gli indirizzi dei data center (es. GitHub Actions). Avvia l'app dal tuo PC.")
+                               "il sito blocca le richieste automatiche. Vedi la sezione 'Limiti' del README.")
         if r.status_code != 200:
             raise RuntimeError(f"Pagina categoria {category_id} p.{page}: HTTP {r.status_code}")
         return r.text

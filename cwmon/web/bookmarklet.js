@@ -25,7 +25,7 @@
   document.body.appendChild(box);
   function say(t) { msg.textContent = t; }
 
-  var RE = /\/l\/(\d{6,})(?:-([a-z0-9-]+))?/, Q = /\(\s*[\d.,]+\s*(?:l|cl|ml)\s*\)/i;
+  var RE = /\/l\/(\d{6,})(?:-([a-z0-9-]+))?/, Q = /\(\s*[\d.,]+\s*(?:cl|ml|lt|litri|litro|litres?|liters?|l)\s*\)/i;
   // testo di un elemento con spazi tra i blocchi (textContent li incolla: "0,75 L)Offerta attuale250 €")
   function leafText(el) {
     var parts = [];
@@ -35,7 +35,7 @@
     return (parts.length ? parts.join(" ") : (el.textContent || "")).replace(/\s+/g, " ").trim();
   }
   // taglia tutto ciò che segue l'ultimo formato "(0,75 L)"
-  function cut(t) { var m = t.match(/^(.*\(\s*[\d.,]+\s*(?:l|cl|ml)\s*\))/i); return m ? m[1] : t; }
+  function cut(t) { var m = t.match(/^(.*\(\s*[\d.,]+\s*(?:cl|ml|lt|litri|litro|litres?|liters?|l)\s*\))/i); return m ? m[1] : t; }
   function grab(doc, out) {
     doc.querySelectorAll('a[href*="/l/"]').forEach(function (a) {
       var m = (a.getAttribute("href") || "").match(RE);

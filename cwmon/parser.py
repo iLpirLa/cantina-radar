@@ -17,7 +17,7 @@ STANDARD_BOTTLE_L = 0.75
 
 # "6 Bottles (0.75L)", "1 Magnum (1.5L)", "2 Half Bottles (0.375L)", "1 Bottle (75cl)"
 _QTY_RE = re.compile(
-    r"(\d+)\s*(?:x\s*)?([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\- ]{0,30}?)?\s*\(\s*([\d.,]+)\s*(l|cl|ml)\s*\)",
+    r"(\d+)\s*(?:x\s*)?([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\- ]{0,30}?)?\s*\(\s*([\d.,]+)\s*(cl|ml|lt|litri|litro|litres?|liters?|l)\s*\)",
     re.IGNORECASE,
 )
 # Formati senza capacità esplicita
@@ -97,6 +97,8 @@ class ParsedTitle:
 def _to_liters(num: str, unit: str) -> float:
     v = float(num.replace(",", "."))
     unit = unit.lower()
+    if unit.startswith("l"):
+        return v
     if unit == "cl":
         return v / 100
     if unit == "ml":

@@ -92,8 +92,10 @@ def start(cfg: dict, minutes: int, port: int, lan: bool) -> None:
     from .monitor import score_all
     from .server import make_handler, write_static
 
+    from .server import normalize_existing
     site = write_static(cfg, port)
     db = DB(cfg["db_path"])
+    normalize_existing(db)
     score_all(cfg, db)
     build(cfg, db)
     first_time = db.stats()["tracciati"] == 0

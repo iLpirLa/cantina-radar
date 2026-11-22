@@ -42,8 +42,9 @@ def _fallback_from_text(text: str, title: str) -> dict:
     return out
 
 
-_SIZE_TAIL_RE = re.compile(r"^(.*\(\s*[\d.,]+\s*(?:l|cl|ml)\s*\))", re.I | re.S)
+_SIZE_TAIL_RE = re.compile(r"^(.*\(\s*[\d.,]+\s*(?:cl|ml|lt|litri|litro|litres?|liters?|l)\s*\))", re.I | re.S)
 _NOISE_RE = re.compile(r"\s*(?:Current bid|Final bid|Starting bid|Offerta attuale|Offerta finale|Offerta iniziale|"
+                       r"Offerte chiuse|Bidding closed|"
                        r"Mancan[oa]|\d+\s*(?:hours?|days?)\s+left).*$", re.I | re.S)
 _SPIRITS_RE = re.compile(r"\b(whisk(?:e)?y|scotch|bourbon|rye|single malt|malt|rum|rhum|cognac|armagnac|calvados|"
                          r"brandy|gin|vodka|tequila|mezcal|grappa|liqueur|liquore|amaro|absinthe|"
@@ -70,6 +71,26 @@ def classify(title: str, url_category: int | None, has_vintage: bool) -> int | N
     if re.search(r"champagne", title or "", re.I):
         return 961
     return 443 if (has_vintage or url_category in (None, 720)) else url_category
+
+
+def normalize_existing(db: DB) -> int:
+    """Ripulisce i lotti salvati da versioni precedenti: titoli sporchi, categoria generica, formato non letto."""
+    n = 0
+    rows = db.conn.execute(
+        "SELECT * FROM lots WHERE category_id IS NULL OR category_id=720 OR bottle_eq IS NULL OR bottle_eq=0 "
+        "OR title LIKE '%Offert%' OR title LIKE '%Mancan%' OR title LIKE '%bid%' OR title LIKE '%left%'").fetchall()
+    for r in rows:
+        title = clean_title(r["title"] or "")
+        p = parse_title(title, r["slug"] or "")
+        cat = classify(title or (r["slug"] or "").replace("-", " "), r["category_id"], p.vintage is not None)
+        db.conn.execute(
+            "UPDATE lots SET title=?, category_id=?, producer=?, cuvee=?, appellation=?, vintage=?, nv=?, mixed=?, "
+            "bottles=?, bottle_eq=?, size_l=?, wine_name=?, wine_key=?, parse_ok=? WHERE id=?",
+            (title or r["title"], cat, p.producer, p.cuvee, p.appellation, p.vintage, int(p.nv), int(p.mixed),
+             p.bottles, p.bottle_eq, p.size_l, p.wine_name, p.wine_key, int(p.ok), r["id"]))
+        n += 1
+    db.commit()
+    return n
 
 
 def ingest(cfg: dict, db: DB, payload: dict) -> dict:
@@ -118,6 +139,7 @@ def ingest(cfg: dict, db: DB, payload: dict) -> dict:
     for lot_id, d in live.items():
         db.update_live(lot_id, d)
     db.commit()
+    normalize_existing(db)
 
     score_all(cfg, db)
     tg = Telegram(cfg["telegram"]["token"], cfg["telegram"]["chat_id"])

@@ -299,6 +299,8 @@ def parse_live_item(item: dict) -> dict:
     reserve_met = _to_bool(_first(d, "reserve_price_met", "reservePriceMet"))
     reserve_set = _to_bool(_first(d, "reserve_price_set", "reservePriceSet", "has_reserve_price"))
     sold_flag = _to_bool(_first(d, "sold", "is_sold", "isSold"))
+    has_winner_key = "winner_token" in d or "winnerToken" in d
+    winner = _first(d, "winner_token", "winnerToken")
     closed_flag = _to_bool(_first(d, "closed", "is_closed", "isClosed"))
 
     now = time.time()
@@ -310,6 +312,8 @@ def parse_live_item(item: dict) -> dict:
     if final:
         if sold_flag is not None:
             sold = sold_flag
+        elif has_winner_key:  # formato reale Catawiki: winner_token valorizzato solo se venduto
+            sold = int(bool(winner)) if reserve_met != 0 else 0
         elif status in _UNSOLD_STATUSES or reserve_met == 0:
             sold = 0
         else:

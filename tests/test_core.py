@@ -317,3 +317,43 @@ def test_vivino_name_cleanup():
     h = parse_search_html(html)[0]
     assert h.name.startswith("Tenuta San Guido Sassicaia 2015") and "Voti" not in h.name
     assert h.rating == 4.6 and h.count == 7998 and h.price == 569.52
+
+
+# Formato reale dell'endpoint live (novembre 2026)
+REAL_OPEN = {"highest_bidder_token": "x", "winner_token": None, "current_bid_amount": {"EUR": 1450, "USD": 1607},
+             "bidding_start_time": "2026-11-13T11:00:00Z", "bidding_end_time": "2099-11-23T19:58:30Z",
+             "reserve_price_met": True, "favorite_count": 65, "closed": False, "id": 108323823}
+REAL_SOLD = {"highest_bidder_token": "a", "winner_token": "a", "current_bid_amount": {"EUR": 82},
+             "bidding_end_time": "2026-11-22T19:15:35Z", "reserve_price_met": None, "closed": True, "id": 108568047}
+REAL_UNSOLD = {"highest_bidder_token": "b", "winner_token": None, "current_bid_amount": {"EUR": 3000},
+               "bidding_end_time": "2026-11-22T20:01:00Z", "reserve_price_met": False, "closed": True, "id": 108515700}
+
+
+def test_real_live_format():
+    o = parse_live_item(REAL_OPEN)
+    assert o["current_bid"] == 1450 and o["final"] == 0 and o["reserve_met"] == 1 and o["end_time"] > time.time()
+    s = parse_live_item(REAL_SOLD)
+    assert s["final"] == 1 and s["sold"] == 1 and s["current_bid"] == 82
+    u = parse_live_item(REAL_UNSOLD)
+    assert u["final"] == 1 and u["sold"] == 0
+
+
+def test_litri_and_normalize_existing(tmp_path):
+    from cwmon.server import clean_title, normalize_existing
+    t = clean_title("1937 Louis Jadot - Pommard - 1 Bottiglia (0,75 litri) Offerta finale 82 € Offerte chiuse")
+    assert t == "1937 Louis Jadot - Pommard - 1 Bottiglia (0,75 litri)"
+    p = parse_title(t)
+    assert p.bottles == 1 and p.bottle_eq == 1.0 and p.vintage == 1937 and p.ok
+    db = DB(str(tmp_path / "n.db"))
+    for lid, title, slug in [(1, "jack daniel s mclaren halo mk1 1 litre", "jack-daniel-s-mclaren-halo-mk1-1-litre"),
+                             (2, "2023 Domaine de Baronarques Chardonnay - Languedoc - 6 Bottiglie (0,75 L)Offerta attuale145 €Mancano 21 ore", "")]:
+        db.upsert_listing({"id": lid, "title": title, "slug": slug, "category_id": 720, "image_url": None, "producer": "",
+                           "cuvee": "", "appellation": "", "vintage": None, "nv": 0, "mixed": 0, "bottles": 0,
+                           "bottle_eq": 0, "size_l": None, "wine_name": "", "wine_key": "", "parse_ok": 0})
+    db.commit()
+    assert normalize_existing(db) == 2
+    jd = db.conn.execute("SELECT * FROM lots WHERE id=1").fetchone()
+    bq = db.conn.execute("SELECT * FROM lots WHERE id=2").fetchone()
+    assert jd["category_id"] == 437
+    assert bq["title"] == "2023 Domaine de Baronarques Chardonnay - Languedoc - 6 Bottiglie (0,75 L)"
+    assert bq["category_id"] == 443 and bq["bottles"] == 6 and bq["parse_ok"] == 1

@@ -94,11 +94,14 @@ def alert_text(lot, s: dict, kind: str, costs: dict | None = None) -> str:
         end_local = dt.strftime("%H:%M") if dt.date() == datetime.now(ROME).date() else dt.strftime("%d/%m %H:%M")
     breakdown = ""
     if costs and lot["current_bid"] is not None and lot["bottle_eq"]:
+        from .lotdetails import costs_for_lot
+        costs, ship_src, _ = costs_for_lot(costs, lot)
         bid = float(lot["current_bid"] or 0)
         fee = bid * costs["commissione_pct"] + costs["commissione_fissa"]
         ship = costs["spedizione_lotto"] + max(0, (lot["bottles"] or 1) - 1) * costs["spedizione_extra_bottiglia"]
         paese = str(costs.get("paese", "")).capitalize()
-        breakdown = (f"Totale: {fmt_eur(bid)} + commissione {fmt_eur(fee)} + spedizione {paese} {fmt_eur(ship)} "
+        lab = "spedizione" if ship_src == "catawiki" else f"spedizione stimata {paese}"
+        breakdown = (f"Totale: {fmt_eur(bid)} + commissione {fmt_eur(fee)} + {lab} {fmt_eur(ship)} "
                      f"= {fmt_eur(bid + fee + ship)}\n")
     rating = ""
     try:

@@ -72,6 +72,9 @@ browser:
   # Quante pagine legge il pulsante "Cantina Radar" a ogni pressione (25 lotti per pagina),
   # a partire da quella che stai guardando. Dopo una modifica, reinstalla il pulsante dalla pagina installa.html
   pagine: 4
+  # Quante pagine di singoli lotti aprire a ogni pressione per leggere spedizione e commissione
+  # (ogni lotto viene letto una sola volta; prima quelli che chiudono presto)
+  dettagli: 20
 
 vivino:
   # Cerca automaticamente il punteggio Vivino dei vini (una volta ogni 30 giorni per vino)

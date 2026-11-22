@@ -134,10 +134,10 @@
       <option value="4.2">almeno 4,2</option><option value="4.4">almeno 4,4</option></select>
     e <b>offerta fino a</b> <input id="gBudget" type="number" min="0" step="10" placeholder="∞"> €.
     Avvisami su Telegram per le aste che chiudono entro <input id="gHours" type="number" min="1" max="72" step="1"> ore.<br>
-    Spedizione verso <select id="gCountry"></select>: circa <input id="gShip" type="number" min="0" step="1"> € a lotto
-    + <input id="gShipX" type="number" min="0" step="0.5"> € per ogni bottiglia in più.
+    Spedizione verso <select id="gCountry"></select> (se Catawiki non la indica: circa <input id="gShip" type="number" min="0" step="1"> € a lotto
+    + <input id="gShipX" type="number" min="0" step="0.5"> € per ogni bottiglia in più).
   </p>
-  <div class="src">La spedizione è una stima: il costo reale dipende dal venditore ed è indicato sulla pagina del lotto. Puoi impostare un valore diverso per ogni paese.</div>
+  <div class="src">Spedizione e commissione vengono lette dalla pagina di ogni lotto su Catawiki (segno ✓ nel conto). Questa stima si usa solo per i lotti di cui l'app non ha ancora letto la pagina.</div>
   <div class="row2">
     <button class="btn primary small" id="gSave">Salva obiettivo</button>
     <span class="saved" id="gSaved"></span>
@@ -247,18 +247,22 @@ function refForm(l) {
 }
 function costCalc(l) {
   const C = DATA.costs, bid = l.bid || 0, bt = l.bt || 1, eq = l.eq || 0;
-  const fee = bid * C.commissione_pct + C.commissione_fissa;
-  const ship = C.spedizione_lotto + Math.max(0, bt - 1) * C.spedizione_extra_bottiglia;
+  const fp = l.fp ?? C.commissione_pct, ff = l.ff ?? C.commissione_fissa;
+  const sl = l.sl ?? C.spedizione_lotto, sx = l.sx ?? C.spedizione_extra_bottiglia;
+  const fee = bid * fp + ff;
+  const ship = sl + Math.max(0, bt - 1) * sx;
+  const fromCw = l.ss === "catawiki", feeCw = l.fs === "catawiki";
   const tot = bid + fee + ship;
   const paese = (DATA.paesi || {})[C.paese] || C.paese;
-  const e2 = v => "€ " + v.toLocaleString("it-IT", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const e2 = v => "€ " + (Number.isInteger(v) ? v.toLocaleString("it-IT") : v.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   const rows = [
     `<div class="r"><span><span class="op"></span>Offerta attuale</span><span>${e2(bid)}</span></div>`,
-    `<div class="r" title="Buyer Protection: ${Math.round(C.commissione_pct * 100)}% dell'offerta + ${e2(C.commissione_fissa)}"><span><span class="op">+</span>Commissione Catawiki (${Math.round(C.commissione_pct * 100)}% + ${e2(C.commissione_fissa)})</span><span>${e2(Math.round(fee * 100) / 100)}</span></div>`,
-    `<div class="r" title="Stima modificabile nel riquadro 'Il tuo obiettivo'"><span><span class="op">+</span>Spedizione stimata (${esc(paese)}${bt > 1 ? `, ${bt} bott.` : ""})</span><span>${e2(ship)}</span></div>`,
+    `<div class="r" title="${feeCw ? "Letta dalla pagina del lotto su Catawiki" : "Tariffa standard Catawiki: non ancora letta dalla pagina del lotto"}"><span><span class="op">+</span>Commissione Catawiki (${+(fp * 100).toFixed(1)}% + ${e2(ff)})${feeCw ? " ✓" : ""}</span><span>${e2(Math.round(fee * 100) / 100)}</span></div>`,
+    fromCw ? `<div class="r" title="Letta dalla pagina del lotto su Catawiki"><span><span class="op">+</span>Spedizione (da Catawiki) ✓</span><span>${e2(ship)}</span></div>`
+      : `<div class="r" title="Catawiki non l'ha ancora indicata per questo lotto: stima modificabile nel riquadro 'Il tuo obiettivo'"><span><span class="op">+</span>Spedizione <i>stimata</i> (${esc(paese)}${bt > 1 ? `, ${bt} bott.` : ""})</span><span>${e2(ship)}</span></div>`,
     `<div class="r tot"><span><span class="op">=</span>Totale da pagare</span><span>${e2(Math.round(tot))}</span></div>`,
   ];
-  if (eq) rows.push(`<div class="r pb"><span><span class="op">÷</span>${String(eq).replace(".", ",")} bottiglie da 0,75 L</span><span>${eur(tot / eq)} a bottiglia</span></div>`);
+  if (eq) rows.push(`<div class="r pb"><span><span class="op">÷</span>${eq === 1 ? "1 bottiglia" : String(eq).replace(".", ",") + " bottiglie"} da 0,75 L</span><span>${eur(tot / eq)} a bottiglia</span></div>`);
   if (l.mv != null) rows.push(`<div class="r mv"><span><span class="op"></span>Valore di mercato</span><span>${eur(l.mv)} a bottiglia</span></div>`);
   return `<div class="calc">${rows.join("")}</div>`;
 }
@@ -397,7 +401,7 @@ function renderHelp() {
   $("#view").innerHTML = `<div class="card"><h3>Come leggere un lotto</h3><dl>
     <dt>Sconto (es. −38%)</dt><dd>Quanto risparmieresti rispetto al valore di mercato se vincessi all'offerta attuale, già al netto di commissione e spedizione. <b>+12%</b> significa che pagheresti il 12% in più del suo valore.</dd>
     <dt>Affare, Interessante…</dt><dd><b>Affare</b>: sconto pari o superiore al tuo obiettivo. <b>Interessante</b>: almeno metà del tuo obiettivo. <b>Prezzo di mercato</b>: più o meno quanto vale. <b>Sopra il mercato</b>: costa più di quanto vale.</dd>
-    <dt>Costo a bottiglia</dt><dd>Offerta + commissione Catawiki (9% + 3 €) + spedizione stimata verso il paese scelto (${eur(DATA.costs.spedizione_lotto)} a lotto + ${eur(DATA.costs.spedizione_extra_bottiglia)} per ogni bottiglia in più, modificabile nel riquadro "Il tuo obiettivo"), diviso per le bottiglie da 0,75 L. Una magnum conta come 2.</dd>
+    <dt>Costo a bottiglia</dt><dd>Offerta + commissione Catawiki + spedizione, diviso per le bottiglie da 0,75 L (una magnum conta come 2). Commissione e spedizione vengono lette dalla pagina del lotto su Catawiki (segno ✓). Se l'app non ha ancora letto la pagina, usa la tariffa standard (9% + 3 €) e la spedizione stimata verso il paese scelto (${eur(DATA.costs.spedizione_lotto)} a lotto + ${eur(DATA.costs.spedizione_extra_bottiglia)} per ogni bottiglia in più, modificabile nel riquadro "Il tuo obiettivo"), diviso per le bottiglie da 0,75 L. Una magnum conta come 2.</dd>
     <dt>Valore di mercato</dt><dd>Quanto vale una bottiglia. Fonti, dalla più affidabile: i prezzi che inserisci tu, lo storico delle aste Catawiki chiuse, il prezzo Vivino, la stima dell'esperto Catawiki.</dd>
     <dt>Affidabilità</dt><dd>Quanto è solida la stima del valore. <b>Alta</b> se viene da un tuo prezzo o da più vendite simili, <b>bassa</b> se si basa su un solo dato indiretto. Le occasioni richiedono almeno un'affidabilità media.</dd>
     <dt>Offri al massimo</dt><dd>L'offerta oltre la quale lo sconto scende sotto il tuo obiettivo. È il numero da tenere a mente quando rilanci negli ultimi minuti.</dd>

@@ -31,6 +31,7 @@ function say(t, cls) { s.textContent = t; s.className = cls || ""; }
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || r.status);
     say(`✓ ${j.lotti} lotti letti (${j.nuovi} nuovi) · ${j.con_offerta} con offerta aggiornata · ` +
+        `spedizione e commissione lette per ${j.costi_letti} di ${j.pagine_lotto} lotti · ` +
         `${j.occasioni} occasioni sopra soglia · ${j.avvisi} avvisi Telegram` +
         (j.live_status && j.live_status !== 200 ? ` · offerte live non disponibili (${j.live_status})` : ""), "ok");
     setTimeout(() => location.href = "/?import=" + Date.now(), 2500);

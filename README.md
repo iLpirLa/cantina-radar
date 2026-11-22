@@ -21,7 +21,7 @@ Valuta le aste di vino, Champagne e vini dolci che stai guardando su Catawiki e 
 - **Storico vendite**: le aste chiuse registrate, più un riquadro per importare un tuo CSV di vendite passate.
 - **Come funziona**: la spiegazione di ogni voce.
 
-Per ogni lotto la colonna di destra mostra il conto completo: offerta + commissione Catawiki (9% + 3 €) + spedizione verso il tuo paese = totale, diviso per le bottiglie, contro il valore di mercato. Sotto c'è **fino a che offerta conviene salire** per restare nel tuo sconto.
+Per ogni lotto la colonna di destra mostra il conto completo: offerta + commissione Catawiki + spedizione = totale, diviso per le bottiglie, contro il valore di mercato. **Commissione e spedizione vengono lette dalla pagina del lotto su Catawiki** (segno ✓): a ogni pressione il pulsante apre in sottofondo fino a 20 pagine di lotti (`browser.dettagli`), cominciando da quelli che chiudono prima, e ognuna una sola volta. Per i lotti non ancora letti si usano la tariffa standard (9% + 3 €) e la spedizione stimata, indicata come *stimata*. Sotto c'è **fino a che offerta conviene salire** per restare nel tuo sconto.
 
 ## Punteggi dei vini
 
@@ -157,6 +157,7 @@ cwmon/
   web/             pulsante per il browser (bookmarklet), pagina di installazione e di importazione
   server.py        server locale: dashboard, importazione, impostazioni, prezzi e storico
   vivino.py        punteggio Vivino (ricerca pubblica, con archivio locale)
+  lotdetails.py    spedizione e commissione lette dalla pagina del lotto
   catawiki.py      interpretazione dei dati Catawiki (offerte live, elenchi)
   parser.py        interpretazione dei titoli (annata, produttore, formato, n. bottiglie)
   valuation.py     valore di mercato, costo reale, offerta massima

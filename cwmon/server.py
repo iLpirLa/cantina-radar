@@ -138,6 +138,24 @@ def ingest(cfg: dict, db: DB, payload: dict) -> dict:
                 db.update_live(lot_id, fb)
     for lot_id, d in live.items():
         db.update_live(lot_id, d)
+    n_det = 0
+    from .lotdetails import parse_details
+    for sid, det in (payload.get("details") or {}).items():
+        try:
+            lot_id = int(sid)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(det, dict):
+            continue
+        d = parse_details(det)
+        sh = d["ship"]
+        db.conn.execute(
+            "UPDATE lots SET ship_it=COALESCE(?, ship_it), ship_es=COALESCE(?, ship_es), ship_any=COALESCE(?, ship_any), "
+            "fee_pct=COALESCE(?, fee_pct), fee_fixed=COALESCE(?, fee_fixed), details_at=? WHERE id=?",
+            (sh.get("italia"), sh.get("spagna"), sh.get("any"), d.get("fee_pct"), d.get("fee_fixed"),
+             int(time.time()), lot_id))
+        if sh or d.get("fee_pct") is not None:
+            n_det += 1
     db.commit()
     normalize_existing(db)
 
@@ -148,7 +166,8 @@ def ingest(cfg: dict, db: DB, payload: dict) -> dict:
                         "live_status": payload.get("live_status")})
     build(cfg, db)
     res = {"lotti": len(lots), "nuovi": nuovi, "con_offerta": len(live), "occasioni": len(candidates(cfg, db)),
-           "avvisi": avvisi, "live_status": payload.get("live_status")}
+           "avvisi": avvisi, "live_status": payload.get("live_status"),
+           "pagine_lotto": len(payload.get("details") or {}), "costi_letti": n_det}
     if cfg.get("vivino", {}).get("attivo", True) and not cfg.get("_no_background"):
         from .vivino import enrich_in_background
         res["vivino"] = enrich_in_background(cfg)
@@ -289,7 +308,9 @@ def write_static(cfg: dict, port: int) -> Path:
     pages = int(cfg.get("browser", {}).get("pagine", 4))
     js = (WEB / "bookmarklet.js").read_text(encoding="utf-8")
     js = "\n".join(l for l in js.splitlines() if not l.strip().startswith("//"))
-    js = js.replace("__ORIGIN__", f"http://localhost:{port}").replace("__PAGES__", str(pages))
+    details = int(cfg.get("browser", {}).get("dettagli", 20))
+    js = (js.replace("__ORIGIN__", f"http://localhost:{port}").replace("__PAGES__", str(pages))
+          .replace("__DETAILS__", str(details)))
     bookmarklet = "javascript:" + urllib.parse.quote(js, safe="(){}[];,.:=+-*/!?&|<>'\"_$")
     inst = (WEB / "installa.html").read_text(encoding="utf-8")
     inst = inst.replace("__BOOKMARKLET__", json.dumps(bookmarklet)).replace("__PAGES_MINUS__", str(max(0, pages - 1)))

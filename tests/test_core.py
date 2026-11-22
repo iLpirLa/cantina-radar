@@ -387,3 +387,36 @@ def test_country_shipping(tmp_path):
     assert c["spedizione"]["italia"]["lotto"] == 25 and out["costi"]["paese"] == "spagna"
     total, per = lot_cost(100, 2.0, 2, c)
     assert total == pytest.approx(100 * 1.09 + 3 + 35 + 3)
+
+
+@pytest.mark.parametrize("det,ship,fee", [
+    ({"s": ["Spedizione verso Italia € 25,00 Consegna stimata 3-5 giorni"]}, {"italia": 25.0, "any": 25.0}, None),
+    ({"s": ["Costi di spedizione € 32 da Spagna con corriere tracciato"]}, {"any": 32.0}, None),
+    ({"s": ["Shipping to Italy € 19.50 · Shipping to Spain € 27"]}, {"italia": 19.5, "spagna": 27.0}, None),
+    ({"s": ["Spedizione gratuita in tutta Europa"]}, {"any": 0.0}, None),
+    ({"s": ["Commissione per la protezione acquirenti: 9% + € 3 sull'offerta finale"]}, {}, (0.09, 3.0)),
+    ({"j": ['"buyer_protection_fee":{"percentage":9,"fixed_amount":{"EUR":3}}',
+            '"shipping_costs":[{"country_code":"IT","amount":{"EUR":2500}},{"cents":true}]']}, {}, (0.09, 3.0)),
+    ({"s": ["Nessuna informazione utile qui"]}, {}, None),
+])
+def test_parse_details(det, ship, fee):
+    from cwmon.lotdetails import parse_details
+    d = parse_details(det)
+    for k, v in ship.items():
+        assert d["ship"].get(k) == v
+    if not ship:
+        assert not d["ship"] or "j" in det
+    if fee:
+        assert d["fee_pct"] == pytest.approx(fee[0]) and d["fee_fixed"] == pytest.approx(fee[1])
+    else:
+        assert "fee_pct" not in d
+
+
+def test_costs_for_lot():
+    from cwmon.lotdetails import costs_for_lot
+    base = dict(COSTS, paese="spagna")
+    lot = {"ship_it": 20.0, "ship_es": 31.0, "ship_any": None, "fee_pct": 0.09, "fee_fixed": 3.0}
+    c, ss, fs = costs_for_lot(base, lot)
+    assert c["spedizione_lotto"] == 31.0 and c["spedizione_extra_bottiglia"] == 0 and ss == "catawiki" and fs == "catawiki"
+    c, ss, fs = costs_for_lot(base, {"ship_it": None, "ship_es": None, "ship_any": None, "fee_pct": None, "fee_fixed": None})
+    assert c["spedizione_lotto"] == 25.0 and ss == "stima" and fs == "stima"

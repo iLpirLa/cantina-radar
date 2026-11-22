@@ -8,6 +8,7 @@ from pathlib import Path
 from .db import DB
 from .monitor import effective_alert_cfg, effective_costs, PAESI
 from .parser import wine_type, WINE_TYPES
+from .lotdetails import costs_for_lot
 from .telegram import lot_url
 
 CATEGORIES = {443: "Vino", 961: "Champagne", 971: "Porto e dolci", 437: "Whisky", 965: "Distillati",
@@ -22,7 +23,9 @@ def build(cfg: dict, db: DB, out_dir: str | Path | None = None) -> Path:
     loc = cfg["catawiki"]["link_locale"]
     a = effective_alert_cfg(cfg, db)
     lots = []
+    base_costs = effective_costs(cfg, db)
     for r in db.open_lots(within_hours=hours):
+        lc, ship_src, fee_src = costs_for_lot(base_costs, r)
         lots.append({
             "id": r["id"], "t": r["title"], "u": lot_url(r["id"], r["slug"], loc), "img": r["image_url"],
             "cat": CATEGORIES.get(r["category_id"], str(r["category_id"] or "")),
@@ -35,6 +38,8 @@ def build(cfg: dict, db: DB, out_dir: str | Path | None = None) -> Path:
             "pr": r["producer"], "cu": r["cuvee"], "ap": r["appellation"], "ok": r["parse_ok"],
             "rt": r["rating"], "rc": r["rating_count"], "ru": r["rating_url"], "cs": r["critic_score"],
             "ty": wine_type(r["title"] or "", r["category_id"]),
+            "fp": lc["commissione_pct"], "ff": lc["commissione_fissa"], "fs": fee_src,
+            "sl": lc["spedizione_lotto"], "sx": lc["spedizione_extra_bottiglia"], "ss": ship_src,
         })
     history = []
     costs = effective_costs(cfg, db)

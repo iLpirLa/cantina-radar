@@ -220,11 +220,13 @@ class Valuator:
         return out
 
     def score(self, lot, target_discount: float) -> dict | None:
+        from .lotdetails import costs_for_lot
         q = self.quality(lot)
         mv = self.market_value(lot)
         if not mv or not lot["bottle_eq"]:
             return q or None
-        total, per_bottle = lot_cost(lot["current_bid"] or 0, lot["bottle_eq"], lot["bottles"], self.costs)
+        costs, _, _ = costs_for_lot(self.costs, lot)
+        total, per_bottle = lot_cost(lot["current_bid"] or 0, lot["bottle_eq"], lot["bottles"], costs)
         discount = 1 - per_bottle / mv["value"]
         return {
             "market_per_bottle": round(mv["value"], 2),
@@ -233,6 +235,6 @@ class Valuator:
             "discount": round(discount, 4),
             "confidence": mv["conf"],
             "value_source": mv["src"],
-            "max_bid": max_bid_for(mv["value"] * (1 - target_discount), lot["bottle_eq"], lot["bottles"], self.costs),
+            "max_bid": max_bid_for(mv["value"] * (1 - target_discount), lot["bottle_eq"], lot["bottles"], costs),
             **q,
         }

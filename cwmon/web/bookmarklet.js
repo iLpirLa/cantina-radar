@@ -5,7 +5,7 @@
 //    Catawiki isola le finestre (Cross-Origin-Opener-Policy)
 // Gli ID dei lotti visti restano nel browser (localStorage) per registrarne poi il prezzo finale.
 (function () {
-  var ORIGIN = "__ORIGIN__", PAGES = __PAGES__, KEY = "cantinaRadarSeen";
+  var ORIGIN = "__ORIGIN__", PAGES = __PAGES__, KEY = "cantinaRadarSeen", DKEY = "cantinaRadarDetails", MAXD = __DETAILS__;
   if (!/catawiki\./.test(location.hostname)) { alert("Usa il pulsante Cantina Radar da una pagina di catawiki.com"); return; }
   var old = document.getElementById("cantina-radar-panel");
   if (old) old.remove();
@@ -60,6 +60,21 @@
       var tx = leafText(a).slice(0, 250);
       if (tx.length > o.text.length) o.text = tx;
     });
+  }
+  // parti della pagina del lotto che parlano di spedizione e commissione (interpretate poi dall'app)
+  var KW = /(spedizion|shipping|env[ií]o|versand|livraison|consegna|protezione acquirent|buyer protection|commission|costi)/gi;
+  var JK = /"[A-Za-z_]*(?:[sS]hipping|[bB]uyer_?[pP]rotection|[bB]uyer[fF]ee|[dD]elivery)[A-Za-z_]*"\s*:/g;
+  function snippets(html, doc) {
+    var txt = leafText(doc.body || doc.documentElement), out = [], last = -999, m;
+    KW.lastIndex = 0;
+    while ((m = KW.exec(txt)) && out.length < 10) {
+      if (m.index - last < 150) continue;
+      last = m.index;
+      out.push(txt.slice(Math.max(0, m.index - 120), m.index + 240));
+    }
+    var js = []; JK.lastIndex = 0;
+    while ((m = JK.exec(html)) && js.length < 10) js.push(html.substr(m.index, 320));
+    return { s: out, j: js };
   }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function loadSeen() { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; } }
@@ -117,7 +132,37 @@
     });
     Object.keys(out).forEach(function (id) { if (!(id in seen)) seen[id] = 0; if (withLive[id]) out[id].text = ""; });
     saveSeen(seen);
-    return { lots: Object.values(out), live: live, live_status: liveStatus, url: location.href };
+
+    // spedizione e commissione dalla pagina di ogni lotto (una volta per lotto, prima quelli che chiudono presto)
+    var det = {}, done = {};
+    try { done = JSON.parse(localStorage.getItem(DKEY) || "{}"); } catch (e) {}
+    Object.keys(done).forEach(function (id) { if (done[id] < now - 5 * 86400) delete done[id]; });
+    var loc = (location.pathname.match(/^\/([a-z]{2})\//) || [0, "it"])[1];
+    if (single) {
+      det[single[1]] = snippets(document.documentElement.outerHTML, document);
+      done[single[1]] = now;
+    }
+    var todo = Object.keys(out).filter(function (id) { return !done[id] && !det[id] && (!seen[id] || seen[id] > now); })
+      .sort(function (a, b) { return (seen[a] || 9e12) - (seen[b] || 9e12); }).slice(0, MAXD);
+    for (var k = 0; k < todo.length; k++) {
+      say("Spedizione e commissione: lotto " + (k + 1) + " di " + todo.length + "…");
+      try {
+        var r3 = await fetch("/" + loc + "/l/" + todo[k], { credentials: "include" });
+        if (r3.ok) {
+          var h3 = await r3.text();
+          det[todo[k]] = snippets(h3, new DOMParser().parseFromString(h3, "text/html"));
+          done[todo[k]] = now;
+        }
+      } catch (e) {}
+      await sleep(1000);
+    }
+    try { localStorage.setItem(DKEY, JSON.stringify(done)); } catch (e) {}
+    var res = [];
+    if (single) {
+      try { res = performance.getEntriesByType("resource").map(function (e) { return e.name.split("?")[0]; })
+        .filter(function (u) { return /\/api\//.test(u); }).slice(0, 40); } catch (e) {}
+    }
+    return { lots: Object.values(out), live: live, live_status: liveStatus, url: location.href, details: det, resources: res };
   }
 
   function openApp(data) {

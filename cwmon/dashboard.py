@@ -40,6 +40,7 @@ def build(cfg: dict, db: DB, out_dir: str | Path | None = None) -> Path:
             "ty": wine_type(r["title"] or "", r["category_id"]),
             "fp": lc["commissione_pct"], "ff": lc["commissione_fissa"], "fs": fee_src,
             "sl": lc["spedizione_lotto"], "sx": lc["spedizione_extra_bottiglia"], "ss": ship_src,
+            "po": r["pickup_only"],
         })
     history = []
     costs = effective_costs(cfg, db)

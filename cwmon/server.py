@@ -151,9 +151,9 @@ def ingest(cfg: dict, db: DB, payload: dict) -> dict:
         sh = d["ship"]
         db.conn.execute(
             "UPDATE lots SET ship_it=COALESCE(?, ship_it), ship_es=COALESCE(?, ship_es), ship_any=COALESCE(?, ship_any), "
-            "fee_pct=COALESCE(?, fee_pct), fee_fixed=COALESCE(?, fee_fixed), details_at=? WHERE id=?",
+            "fee_pct=COALESCE(?, fee_pct), fee_fixed=COALESCE(?, fee_fixed), details_at=?, pickup_only=? WHERE id=?",
             (sh.get("italia"), sh.get("spagna"), sh.get("any"), d.get("fee_pct"), d.get("fee_fixed"),
-             int(time.time()), lot_id))
+             int(time.time()), 1 if d.get("solo_ritiro") else 0, lot_id))
         if sh or d.get("fee_pct") is not None:
             n_det += 1
     db.commit()

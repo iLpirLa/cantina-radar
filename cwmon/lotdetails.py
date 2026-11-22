@@ -56,6 +56,32 @@ def _money(v, key: str = "") -> float | None:
     return None
 
 
+def parse_catawiki_shipping(data) -> dict | None:
+    """Formato reale (/buyer/api/v2/lots/<id>/shipping): {"shipping": {"rates": [{"region_code": "it",
+    "price": 4000.0, ...}], "destination_country": {...}, "is_pickup_only": false}}. Prezzi in centesimi."""
+    sh = data.get("shipping") if isinstance(data, dict) else None
+    if not isinstance(sh, dict) or not isinstance(sh.get("rates"), list):
+        return None
+    out: dict = {}
+    for r in sh["rates"]:
+        if not isinstance(r, dict) or r.get("price") is None:
+            continue
+        if str(r.get("currency_code") or "EUR").upper() != "EUR":
+            continue
+        code = str(r.get("region_code") or "").lower()
+        paese = _COUNTRY_CODES.get(code.upper())
+        if paese:
+            out.setdefault(paese, float(r["price"]) / 100)
+    dest = (sh.get("destination_country") or {})
+    code = str(((dest.get("country") or {}).get("short_code")) or "").upper()
+    rate = (dest.get("shipping") or {}).get("rate")
+    if code in _COUNTRY_CODES and rate is not None and (dest.get("shipping") or {}).get("is_available", True):
+        out.setdefault(_COUNTRY_CODES[code], float(rate) / 100)
+    if sh.get("is_pickup_only"):
+        out["solo_ritiro"] = 1.0
+    return out
+
+
 def parse_shipping_json(body: str) -> dict:
     """Risposta JSON della richiesta di spedizione: {paese|'any': costo minimo}."""
     import json
@@ -63,6 +89,9 @@ def parse_shipping_json(body: str) -> dict:
         data = json.loads(body)
     except (ValueError, TypeError):
         return {}
+    cw = parse_catawiki_shipping(data)
+    if cw is not None:
+        return cw
     found: dict[str, list[float]] = {}
 
     def walk(o, country=None):
@@ -100,6 +129,8 @@ def parse_details(det: dict) -> dict:
         if not isinstance(k, dict):
             continue
         res = parse_shipping_json(str(k.get("b") or ""))
+        if res.pop("solo_ritiro", None):
+            out["solo_ritiro"] = True
         cc = _COUNTRY_CODES.get(str(k.get("c") or "").upper())
         for key, val in res.items():
             target = cc if (cc and key == "any") else key
@@ -132,8 +163,8 @@ def parse_details(det: dict) -> dict:
                             out["fee_fixed"] = fx / 100 if fx >= 100 else fx
                         break
 
-    # --- spedizione: per paese ("Italia € 25") o importo unico vicino a "Spedizione"
-    for t in texts:
+    # --- spedizione: per paese ("Spedizione in Italia: € 40") o importo unico vicino a "Spedizione"
+    for t in ([] if out["ship"] else texts):
         if not _SHIP_KW.search(t):
             continue
         for paese, rx in COUNTRIES.items():

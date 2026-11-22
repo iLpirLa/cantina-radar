@@ -1,3 +1,4 @@
+import json
 import time
 from pathlib import Path
 
@@ -440,3 +441,20 @@ def test_shipping_response_with_country_variant():
     from cwmon.lotdetails import parse_details
     d = parse_details({"k": [{"c": "IT", "b": '{"price": 21}'}, {"c": "ES", "b": '{"price": 28}'}]})
     assert d["ship"] == {"italia": 21.0, "spagna": 28.0}
+
+
+def test_real_catawiki_shipping_format():
+    from cwmon.lotdetails import parse_details
+    body = json.dumps({"shipping": {"rates": [
+        {"region_code": "es", "region_name": "Spain (Mainland & Balearic Islands)", "price": 4500.0, "currency_code": "EUR"},
+        {"region_code": "it", "region_name": "Italy", "price": 4000.0, "currency_code": "EUR"},
+        {"region_code": "pt", "region_name": "Portugal", "price": 3000.0, "currency_code": "EUR"}],
+        "destination_country": {"country": {"name": "Italy", "short_code": "it"},
+                                "shipping": {"currency_code": "EUR", "rate": 4000.0, "is_available": True}},
+        "is_pickup_only": False}})
+    d = parse_details({"k": [{"c": "", "b": body}], "s": ["Spedizione in Italia: € 99"]})
+    assert d["ship"] == {"spagna": 45.0, "italia": 40.0}  # la risposta strutturata vince sul testo
+    d2 = parse_details({"s": ["Spese di spedizione Spedizione in Italia: € 40 Altre destinazioni"]})
+    assert d2["ship"]["italia"] == 40.0
+    d3 = parse_details({"k": [{"b": json.dumps({"shipping": {"rates": [], "is_pickup_only": True}})}]})
+    assert d3.get("solo_ritiro") is True

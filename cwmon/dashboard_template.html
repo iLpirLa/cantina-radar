@@ -275,6 +275,7 @@ function lotCard(l) {
     l.rt ? `<a class="chip star" href="${esc(l.ru || "#")}" target="_blank" rel="noopener" title="Valutazione media degli utenti Vivino">★ ${l.rt.toFixed(1).replace(".", ",")} Vivino${l.rc ? ` · ${l.rc.toLocaleString("it-IT")} voti` : ""}</a>` : "",
     l.cs ? `<span class="chip critic" title="Punteggio della critica inserito da te">✎ ${esc(l.cs)}</span>` : "",
     l.mix ? `<span class="chip warn">lotto misto</span>` : "",
+    l.po ? `<span class="chip warn" title="Il venditore non spedisce: il lotto va ritirato di persona">solo ritiro</span>` : "",
     (l.rs && l.rm === 0) ? `<span class="chip warn" title="Il venditore ha un prezzo minimo non ancora raggiunto: a questa offerta il lotto non verrebbe venduto">riserva non raggiunta</span>` : "",
   ].join("");
   let right;

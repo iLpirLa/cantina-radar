@@ -151,10 +151,8 @@
     }
     async function shipping(id) {
       if (!tpl) return [];
+      // una sola richiesta: la risposta di Catawiki contiene le tariffe di tutti i paesi
       var variants = [{ c: "", u: tpl.replace("{ID}", id) }];
-      if (/=(it|es)(?=&|$)/i.test(tpl)) {
-        variants = ["IT", "ES"].map(function (cc) { return { c: cc, u: tpl.replace("{ID}", id).replace(/=(it|es)(?=&|$)/i, "=" + cc) }; });
-      }
       var outv = [];
       for (var v = 0; v < variants.length; v++) {
         try {

@@ -89,9 +89,14 @@ def parse_search_html(html: str) -> list[VivinoHit]:
         if len(name) < 3:
             name_el = card.find(class_=re.compile("wine-card__name|name", re.I))
             name = name_el.get_text(" ", strip=True) if name_el else ""
+        # il link può contenere tutta la scheda: taglia al punteggio ("4,6 ( 7998 Voti ) 569 €")
+        name = re.split(r"\s(?:[1-4][.,]\d|5[.,]0)\s*\(", name)[0].strip()
         region_el = card.find(class_=re.compile("wine-card__region|region", re.I))
         if region_el:
-            name = f"{name} {region_el.get_text(' ', strip=True)}"
+            region = region_el.get_text(" ", strip=True)
+            if region and region not in name:
+                name = f"{name} {region}"
+        name = re.sub(r"\s+([,.])", r"\1", re.sub(r"\s+", " ", name))
         rating = None
         avg = card.find(class_=re.compile("average__number|averageValue|rating__average", re.I))
         if avg:

@@ -308,3 +308,12 @@ def test_vivino_parse_and_match():
     p = parse_title("2015 Tenuta San Guido, Sassicaia - Bolgheri - 1 Bottle (0.75L)")
     lot = {"wine_name": p.wine_name, "vintage": 2015, "producer": p.producer, "cuvee": p.cuvee, "appellation": p.appellation}
     assert best_match(lot, hits).rating == 4.7
+
+
+def test_vivino_name_cleanup():
+    from cwmon.vivino import parse_search_html
+    html = """<div class="card"><a href="/tenuta-san-guido-sassicaia/w/1093?year=2015">Tenuta San Guido Sassicaia 2015
+      Bolgheri Sassicaia , Italia <span class="average__number">4,6</span> ( 7998 Voti ) 569,52 € Bolgheri Sassicaia , Italia</a></div>"""
+    h = parse_search_html(html)[0]
+    assert h.name.startswith("Tenuta San Guido Sassicaia 2015") and "Voti" not in h.name
+    assert h.rating == 4.6 and h.count == 7998 and h.price == 569.52

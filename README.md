@@ -33,7 +33,7 @@ Ogni lotto dice in parole quanto ti costerebbe a bottiglia, quanto vale e **fino
 |---|---|---|
 | `riferimenti.csv` | alta (90%) | I prezzi che inserisci tu, per bottiglia (da Wine-Searcher, Vivino, la tua enoteca…) |
 | Storico stessa annata | 45–85% | Prezzi finali delle aste Catawiki chiuse, registrati automaticamente dall'app. Più vendite = più affidabile |
-| Prezzo Vivino | 50% | Prezzo in euro mostrato da Vivino per quell'annata (quando c'è) |
+| Prezzo Vivino | 45% | Prezzo da negozio mostrato da Vivino per quell'annata. Di solito è più alto del prezzo in asta, quindi da solo non basta per segnalare un'occasione |
 | Storico altre annate | 35% | Stesso vino, annate diverse: mostrato in dashboard ma sotto la soglia degli avvisi |
 
 Se ci sono più fonti, il valore è una media pesata sull'affidabilità. Quando le fonti concordano l'affidabilità sale, quando divergono scende.

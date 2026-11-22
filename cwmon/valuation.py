@@ -126,7 +126,8 @@ class Valuator:
             return None
         if lot["vintage"] and v.get("year") and v["year"] != lot["vintage"]:
             return None
-        return {"value": float(v["price"]), "conf": 0.5, "src": "prezzo Vivino", "n": 1}
+        # prezzo da negozio: tende a sovrastimare il valore in asta, quindi affidabilità bassa
+        return {"value": float(v["price"]), "conf": 0.45, "src": "prezzo Vivino (negozio)", "n": 1}
 
     def _from_refs(self, lot) -> dict | None:
         best, best_s = None, 0.0

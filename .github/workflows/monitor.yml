@@ -1,0 +1,69 @@
+name: Monitor aste vino
+
+on:
+  schedule:
+    # Ogni 30 minuti dalle 07:00 alle 23:30 ora italiana (orari in UTC; d'estate scorrono di un'ora)
+    - cron: "*/30 6-22 * * *"
+  workflow_dispatch: {}   # pulsante "Run workflow" per lanciarlo a mano
+
+permissions:
+  contents: write   # salva il database sul branch "data"
+  pages: write      # pubblica la dashboard
+  id-token: write
+
+concurrency:
+  group: cwmon
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installa dipendenze
+        run: pip install -r requirements.txt
+
+      - name: Recupera il database dal branch "data"
+        run: |
+          mkdir -p data
+          if git fetch --depth=1 origin data 2>/dev/null; then
+            git show FETCH_HEAD:cwmon.db > data/cwmon.db && echo "Database recuperato"
+          else
+            echo "Primo avvio: nessun database"
+          fi
+
+      - name: Esegui il monitoraggio
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CWMON_DASHBOARD_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: python -m cwmon run
+
+      - name: Salva il database sul branch "data"
+        if: always()
+        run: |
+          [ -f data/cwmon.db ] || exit 0
+          TMP=$(mktemp -d)
+          cp data/cwmon.db "$TMP/"
+          cd "$TMP"
+          git init -q -b data
+          git add cwmon.db
+          git -c user.name="cwmon-bot" -c user.email="cwmon-bot@users.noreply.github.com" commit -qm "db $(date -u +%FT%TZ)"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -42,12 +42,47 @@ def _fallback_from_text(text: str, title: str) -> dict:
     return out
 
 
+_SIZE_TAIL_RE = re.compile(r"^(.*\(\s*[\d.,]+\s*(?:l|cl|ml)\s*\))", re.I | re.S)
+_NOISE_RE = re.compile(r"\s*(?:Current bid|Final bid|Starting bid|Offerta attuale|Offerta finale|Offerta iniziale|"
+                       r"Mancan[oa]|\d+\s*(?:hours?|days?)\s+left).*$", re.I | re.S)
+_SPIRITS_RE = re.compile(r"\b(whisk(?:e)?y|scotch|bourbon|rye|single malt|malt|rum|rhum|cognac|armagnac|calvados|"
+                         r"brandy|gin|vodka|tequila|mezcal|grappa|liqueur|liquore|amaro|absinthe|"
+                         r"years? old|anni|jack daniel|johnnie walker|macallan|caol ila|lagavulin|ardbeg|"
+                         r"laphroaig|glen\w*|yamazaki|hibiki|nikka)\b", re.I)
+
+
+def clean_title(title: str) -> str:
+    t = re.sub(r"\s+", " ", title or "").strip()
+    m = _SIZE_TAIL_RE.match(t)
+    if m:
+        return m.group(1).strip()
+    return _NOISE_RE.sub("", t).strip(" -")
+
+
+def classify(title: str, url_category: int | None, has_vintage: bool) -> int | None:
+    """Assegna la sottocategoria quando la pagina è quella generale (720 = Vino e distillati)."""
+    if url_category in (437, 965, 961, 971):
+        return url_category
+    if _SPIRITS_RE.search(title or "") and not re.search(r"\b(champagne|chateau|château|domaine|barolo|"
+                                                        r"brunello|bordeaux|bourgogne)\b", title or "", re.I):
+        return 437 if re.search(r"whisk|scotch|bourbon|malt|jack daniel|caol ila|lagavulin|ardbeg|laphroaig|glen|"
+                                r"macallan|yamazaki|hibiki|nikka", title or "", re.I) else 965
+    if re.search(r"champagne", title or "", re.I):
+        return 961
+    return 443 if (has_vintage or url_category in (None, 720)) else url_category
+
+
 def ingest(cfg: dict, db: DB, payload: dict) -> dict:
     from .monitor import score_all, send_alerts, candidates
     from .dashboard import build
     from .telegram import Telegram
 
     lots = payload.get("lots") or []
+    try:  # ultimo invio dal browser, utile per la diagnosi
+        dbg = Path(cfg["db_path"]).parent / "ultimo_import.json"
+        dbg.write_text(json.dumps(payload, ensure_ascii=False, indent=1)[:3_000_000], encoding="utf-8")
+    except OSError:
+        pass
     url = str(payload.get("url") or "")
     mcat = re.search(r"/c/(\d+)", url)
     category = int(mcat.group(1)) if mcat else None
@@ -65,11 +100,11 @@ def ingest(cfg: dict, db: DB, payload: dict) -> dict:
             lot_id = int(l.get("id"))
         except (TypeError, ValueError):
             continue
-        title, slug = str(l.get("title") or "")[:400], str(l.get("slug") or "")[:300]
+        title, slug = clean_title(str(l.get("title") or ""))[:400], str(l.get("slug") or "")[:300]
         p = parse_title(title, slug)
         db.upsert_listing({
             "id": lot_id, "title": title or p.raw or slug.replace("-", " "), "slug": slug or None,
-            "category_id": category, "image_url": (str(l.get("img") or "")[:500] or None),
+            "category_id": classify(title or slug.replace("-", " "), category, p.vintage is not None), "image_url": (str(l.get("img") or "")[:500] or None),
             "producer": p.producer, "cuvee": p.cuvee, "appellation": p.appellation, "vintage": p.vintage,
             "nv": int(p.nv), "mixed": int(p.mixed), "bottles": p.bottles, "bottle_eq": p.bottle_eq,
             "size_l": p.size_l, "wine_name": p.wine_name, "wine_key": p.wine_key, "parse_ok": int(p.ok),

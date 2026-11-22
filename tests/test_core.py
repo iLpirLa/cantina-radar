@@ -204,7 +204,7 @@ def test_collect_end_to_end(tmp_path, monkeypatch):
     cfg["catawiki"]["days_ahead"] = 1
     cfg["dashboard"]["cartella"] = str(tmp_path / "site")
     summary = monitor.run_once(cfg)
-    assert summary["scoperti"] == 3 and summary["live"] == 3 and summary["pagine_lotto"] == 3
+    assert summary["scoperti"] == 5 and summary["live"] == 5 and summary["pagine_lotto"] == 5
     db = DB(cfg["db_path"])
     lynch = db.conn.execute("SELECT * FROM lots WHERE id=108491008").fetchone()
     assert lynch["vintage"] == 2008 and lynch["current_bid"] == 40 and lynch["estimate_low"] == 110
@@ -248,3 +248,17 @@ def test_bookmarklet_generation(tmp_path):
     html = (site / "installa.html").read_text(encoding="utf-8")
     assert "javascript:" in html and "__ORIGIN__" not in html and "__PAGES__" not in html
     assert (site / "ingest.html").exists()
+
+
+def test_clean_title_and_classify():
+    from cwmon.server import clean_title, classify
+    assert clean_title("2022 Catena Zapata Malbec Argentino - Mendoza - 3 Bottiglie (0,75 L)Offerta attuale250 €Mancano 20 ore") \
+        == "2022 Catena Zapata Malbec Argentino - Mendoza - 3 Bottiglie (0,75 L)"
+    assert clean_title("Jack Daniel's - McLaren Halo MK1 - 1 litre Offerta attuale 725 €") == "Jack Daniel's - McLaren Halo MK1 - 1 litre"
+    assert classify("caol ila 25 years old 70cl", 720, False) == 437
+    assert classify("Hennessy XO - Cognac - 70cl", 720, False) == 965
+    assert classify("2023 Tenuta San Guido - Sassicaia - Bolgheri - 1 Magnum (1,5 L)", 720, True) == 443
+    assert classify("2012 Dom Pérignon - Champagne Brut - 1 Bottiglia (0,75 L)", 720, True) == 961
+    assert classify("qualsiasi", 443, False) == 443
+    p = parse_title("2022 Catena Zapata Malbec Argentino - Mendoza - 3 Bottiglie (0,75 L)")
+    assert p.bottles == 3 and p.bottle_eq == 3 and p.vintage == 2022 and p.ok

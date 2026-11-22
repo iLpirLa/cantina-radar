@@ -91,7 +91,7 @@ class DB:
         now = int(time.time())
         cols = ["id"] + LOT_FIELDS
         vals = [lot.get(c) for c in cols]
-        upd = ", ".join(f"{c}=COALESCE(excluded.{c}, lots.{c})" for c in LOT_FIELDS)
+        upd = ", ".join(f"{c}=COALESCE(excluded.{c}, lots.{c})" for c in LOT_FIELDS)  # i nuovi valori vincono
         self.conn.execute(
             f"INSERT INTO lots({','.join(cols)}, first_seen, last_seen) VALUES({','.join('?' * len(cols))}, ?, ?) "
             f"ON CONFLICT(id) DO UPDATE SET {upd}, last_seen=excluded.last_seen",

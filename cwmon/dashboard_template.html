@@ -98,6 +98,7 @@
   <label>Budget € <input type="number" id="budget" min="0" step="10" placeholder="∞" style="width:90px"></label>
   <button class="chip" id="onlyVal">Solo valutati</button>
   <button class="chip" id="onlyRes">Riserva ok</button>
+  <button class="chip" id="noSpirits">Nascondi distillati</button>
 </section>
 
 <main>
@@ -137,13 +138,15 @@ function left(end){
   return h ? h + "h " + String(m%60).padStart(2,"0") + "m" : m + " min";
 }
 const S = DATA.settings;
-let sortK = "d", asc = false, onlyVal = true, onlyRes = false;
+let sortK = "d", asc = false, onlyVal = true, onlyRes = false, noSpirits = true;
 
 $("#updated").textContent = "ultimo aggiornamento " + new Date(DATA.generated*1000).toLocaleString("it-IT",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
 if (location.protocol === "file:" || location.hostname.endsWith("github.io")) $("#install").hidden = true;
 $("#settings").textContent = `Soglia avvisi: sconto ≥ ${pct(S.sconto_minimo)} · affidabilità ≥ ${pct(S.affidabilita_minima)} · entro ${S.ore_alla_chiusura}h`;
 [...new Set(DATA.lots.map(l => l.cat).filter(Boolean))].sort().forEach(c => $("#cat").insertAdjacentHTML("beforeend", `<option>${esc(c)}</option>`));
 $("#onlyVal").classList.toggle("on", onlyVal);
+$("#noSpirits").classList.toggle("on", noSpirits);
+const SPIRITS = new Set(["Whisky", "Distillati"]);
 
 function kpis(){
   const open = DATA.lots.filter(l => !l.end || l.end > now());
@@ -164,7 +167,7 @@ function render(){
     (!q || (l.t||"").toLowerCase().includes(q) || String(l.v||"").includes(q)) &&
     (!cat || l.cat === cat) && (!hrs || (l.end && l.end - now() <= hrs*3600)) &&
     (!onlyVal || l.d != null) && (l.d == null || l.d >= minD) &&
-    (!budget || (l.bid||0) <= budget) && (!onlyRes || !(l.rs && l.rm === 0)) && (!l.end || l.end > now()));
+    (!budget || (l.bid||0) <= budget) && (!noSpirits || !SPIRITS.has(l.cat)) && (!onlyRes || !(l.rs && l.rm === 0)) && (!l.end || l.end > now()));
   rows.sort((a,b) => { let x = a[sortK], y = b[sortK];
     if(x == null) return 1; if(y == null) return -1;
     if(typeof x === "string") return asc ? x.localeCompare(y) : y.localeCompare(x);
@@ -202,6 +205,7 @@ document.querySelectorAll("th[data-k]").forEach(th => th.onclick = () => {
 });
 ["#q","#cat","#hours","#minD","#budget"].forEach(s => $(s).addEventListener("input", render));
 $("#onlyVal").onclick = e => { onlyVal = !onlyVal; e.target.classList.toggle("on", onlyVal); render(); };
+$("#noSpirits").onclick = e => { noSpirits = !noSpirits; e.target.classList.toggle("on", noSpirits); render(); };
 $("#onlyRes").onclick = e => { onlyRes = !onlyRes; e.target.classList.toggle("on", onlyRes); render(); };
 kpis(); render(); setInterval(render, 60000);
 </script>

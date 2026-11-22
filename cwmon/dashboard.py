@@ -9,7 +9,8 @@ from .db import DB
 from .monitor import effective_alert_cfg
 from .telegram import lot_url
 
-CATEGORIES = {443: "Vino", 961: "Champagne", 971: "Porto e dolci", 437: "Whisky", 965: "Distillati"}
+CATEGORIES = {443: "Vino", 961: "Champagne", 971: "Porto e dolci", 437: "Whisky", 965: "Distillati",
+              720: "Vino e distillati"}
 TEMPLATE = Path(__file__).with_name("dashboard_template.html")
 
 

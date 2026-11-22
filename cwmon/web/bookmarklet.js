@@ -26,6 +26,16 @@
   function say(t) { msg.textContent = t; }
 
   var RE = /\/l\/(\d{6,})(?:-([a-z0-9-]+))?/, Q = /\(\s*[\d.,]+\s*(?:l|cl|ml)\s*\)/i;
+  // testo di un elemento con spazi tra i blocchi (textContent li incolla: "0,75 L)Offerta attuale250 €")
+  function leafText(el) {
+    var parts = [];
+    el.querySelectorAll("*").forEach(function (e) {
+      if (!e.children.length) { var t = (e.textContent || "").trim(); if (t) parts.push(t); }
+    });
+    return (parts.length ? parts.join(" ") : (el.textContent || "")).replace(/\s+/g, " ").trim();
+  }
+  // taglia tutto ciò che segue l'ultimo formato "(0,75 L)"
+  function cut(t) { var m = t.match(/^(.*\(\s*[\d.,]+\s*(?:l|cl|ml)\s*\))/i); return m ? m[1] : t; }
   function grab(doc, out) {
     doc.querySelectorAll('a[href*="/l/"]').forEach(function (a) {
       var m = (a.getAttribute("href") || "").match(RE);
@@ -35,11 +45,19 @@
       var im = a.querySelector("img");
       if (im) { c.push(im.getAttribute("alt") || ""); if (!o.img) o.img = im.currentSrc || im.getAttribute("src") || im.getAttribute("data-src") || ""; }
       a.querySelectorAll("p,h2,h3,h4,span,div").forEach(function (e) {
-        var t = (e.textContent || "").trim();
-        if (t.length < 300 && Q.test(t)) c.push(t);
+        var t = leafText(e);
+        if (t.length < 300) c.push(t);
       });
-      c.forEach(function (t) { t = t.replace(/\s+/g, " ").trim(); if (Q.test(t) && t.length > o.title.length) o.title = t; });
-      var tx = (a.textContent || "").replace(/\s+/g, " ").trim().slice(0, 250);
+      var best = "";
+      c.forEach(function (t) { t = cut(t.replace(/\s+/g, " ").trim()); if (Q.test(t) && t.length > best.length) best = t; });
+      if (!best) {  // nessun formato tra parentesi (es. distillati): primo titolo/testo plausibile
+        for (var k = 0; k < c.length; k++) {
+          var t2 = c[k].replace(/\s+/g, " ").trim();
+          if (t2.length >= 8 && t2.length <= 200 && !/^(offerta|current|final|starting|mancano|\d+\s*(ore|h|min|giorni?))/i.test(t2)) { best = t2; break; }
+        }
+      }
+      if (best && (Q.test(best) || !Q.test(o.title)) && best.length > o.title.length) o.title = best;
+      var tx = leafText(a).slice(0, 250);
       if (tx.length > o.text.length) o.text = tx;
     });
   }

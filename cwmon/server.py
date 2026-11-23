@@ -76,6 +76,10 @@ def classify(title: str, url_category: int | None, has_vintage: bool) -> int | N
 def normalize_existing(db: DB) -> int:
     """Ripulisce i lotti salvati da versioni precedenti: titoli sporchi, categoria generica, formato non letto."""
     n = 0
+    for r in db.conn.execute("SELECT id, title, slug, mixed, parse_ok FROM lots WHERE final=0").fetchall():
+        p = parse_title(r["title"] or "", r["slug"] or "")
+        if int(p.mixed) != (r["mixed"] or 0) or int(p.ok) != (r["parse_ok"] or 0):
+            db.conn.execute("UPDATE lots SET mixed=?, parse_ok=? WHERE id=?", (int(p.mixed), int(p.ok), r["id"]))
     rows = db.conn.execute(
         "SELECT * FROM lots WHERE category_id IS NULL OR category_id=720 OR bottle_eq IS NULL OR bottle_eq=0 "
         "OR title LIKE '%Offert%' OR title LIKE '%Mancan%' OR title LIKE '%bid%' OR title LIKE '%left%'").fetchall()
@@ -231,15 +235,14 @@ def add_reference(cfg: dict, db: DB, data: dict) -> dict:
         raise ValueError("prezzo non valido") from None
     if not 1 <= price <= 1_000_000:
         raise ValueError("prezzo non valido")
-    key = lot["wine_key"] or f"lotto:{lot['id']}"   # lotti non interpretabili: valore legato al singolo lotto
-    vintage = None if data.get("ogni_annata") else lot["vintage"]
+    scoped = bool(lot["mixed"]) or not lot["wine_key"]
+    key = f"lotto:{lot['id']}" if scoped else lot["wine_key"]   # lotto misto: valore solo per questo lotto
+    vintage = None if (scoped or data.get("ogni_annata")) else lot["vintage"]
     name = " ".join(x for x in (lot["producer"], lot["cuvee"], lot["appellation"]) if x).strip() or lot["title"]
     score = str(data.get("punteggio") or "").strip()[:40]
     db.conn.execute(
         "INSERT OR REPLACE INTO manual_values(wine_key, vintage, wine_name, name, price, score, lot_id, updated_at) "
         "VALUES(?,?,?,?,?,?,?,?)", (key, vintage, lot["wine_name"] or "", name, price, score, lot["id"], int(time.time())))
-    if key.startswith("lotto:"):
-        db.conn.execute("UPDATE lots SET wine_key=? WHERE id=?", (key, lot["id"]))
     db.commit()
     # copia leggibile, solo per consultazione
     try:
@@ -256,6 +259,27 @@ def add_reference(cfg: dict, db: DB, data: dict) -> dict:
     build(cfg, db)
     row = db.conn.execute("SELECT discount, market_per_bottle FROM lots WHERE id=?", (lot["id"],)).fetchone()
     return {"vino": name, "annata": vintage, "prezzo": price, "valore": row["market_per_bottle"], "sconto": row["discount"]}
+
+
+def remove_reference(cfg: dict, db: DB, data: dict) -> dict:
+    """Rimuove il valore inserito da te che oggi si applica a questo lotto."""
+    from .monitor import score_all
+    from .dashboard import build
+    lot = db.conn.execute("SELECT * FROM lots WHERE id=?", (int(data.get("lot_id") or 0),)).fetchone()
+    if not lot:
+        raise ValueError("lotto non trovato")
+    keys = [(f"lotto:{lot['id']}", None)]
+    if not lot["mixed"]:
+        keys += [(lot["wine_key"], lot["vintage"]), (lot["wine_key"], None)]
+    n = 0
+    for k, v in keys:
+        n += db.conn.execute("DELETE FROM manual_values WHERE wine_key=? AND vintage IS ?", (k, v)).rowcount
+    if not n:  # valore trovato per somiglianza del nome: rimuovi quello legato al lotto d'origine
+        n = db.conn.execute("DELETE FROM manual_values WHERE lot_id=?", (lot["id"],)).rowcount
+    db.commit()
+    score_all(cfg, db)
+    build(cfg, db)
+    return {"rimossi": n}
 
 
 def import_history_csv(cfg: dict, db: DB, text: str) -> dict:
@@ -369,6 +393,7 @@ def make_handler(cfg: dict, site: Path):
 
         def do_POST(self):
             routes = {"/api/ingest": ingest, "/api/settings": update_settings, "/api/reference": add_reference,
+                      "/api/reference/remove": remove_reference,
                       "/api/storico-csv": lambda c, d, p: import_history_csv(c, d, str(p.get("csv") or ""))}
             fn = routes.get(self.path)
             if fn is None:

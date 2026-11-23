@@ -119,12 +119,23 @@ class Valuator:
     # ----------------------------------------------------------------- fonti
     def manual_for(self, lot) -> dict | None:
         """Valore inserito da te dalla dashboard: stessa chiave e annata, poi 'tutte le annate', poi nome simile."""
+        try:
+            mixed = bool(lot["mixed"])
+        except (IndexError, KeyError):
+            mixed = False
+        if mixed:
+            # lotto misto: nessun valore di riferimento esatto; vale solo un valore inserito per questo lotto
+            m = self._manual_key.get((f"lotto:{lot['id']}", None))
+            return m
         m = (self._manual_key.get((lot["wine_key"], lot["vintage"])) or self._manual_key.get((lot["wine_key"], None))
-             or self._manual_lot.get(lot["id"]))
+             or (self._manual_lot.get(lot["id"]) if not str((self._manual_lot.get(lot["id"]) or {}).get("wine_key", "")).startswith("lotto:") else None)
+             or self._manual_key.get((f"lotto:{lot['id']}", None)))
         if m:
             return m
         best, best_s = None, 0.0
         for c in self.manual:
+            if str(c["wine_key"]).startswith("lotto:"):
+                continue  # valori legati a un singolo lotto (es. misto) non si propagano
             if c["vintage"] is not None and c["vintage"] != lot["vintage"]:
                 continue
             s = similarity(lot["wine_name"], c["wine_name"] or "")
@@ -218,8 +229,10 @@ class Valuator:
     def market_value(self, lot) -> dict | None:
         m = self.manual_for(lot)
         if m:  # il tuo valore ha sempre la precedenza: niente medie con altre fonti
+            scoped = str(m["wine_key"]).startswith("lotto:")
             return {"value": float(m["price"]), "conf": 0.95,
-                    "src": "tuo valore" + ("" if m["vintage"] is not None else " (tutte le annate)")}
+                    "src": "tuo valore" + (" (solo questo lotto)" if scoped else
+                                           "" if m["vintage"] is not None else " (tutte le annate)")}
         if not lot["parse_ok"]:
             # lotti misti o non interpretabili: solo stima esperto
             return self._from_estimate(lot)

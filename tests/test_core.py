@@ -462,3 +462,41 @@ def test_real_catawiki_shipping_format():
     assert d2["ship"]["italia"] == 40.0
     d3 = parse_details({"k": [{"b": json.dumps({"shipping": {"rates": [], "is_pickup_only": True}})}]})
     assert d3.get("solo_ritiro") is True
+
+
+def _add_lot(db, lid, title, bid=60):
+    p = parse_title(title)
+    db.upsert_listing({"id": lid, "title": title, "slug": "", "category_id": 961, "image_url": None, "producer": p.producer,
+                       "cuvee": p.cuvee, "appellation": p.appellation, "vintage": p.vintage, "nv": int(p.nv),
+                       "mixed": int(p.mixed), "bottles": p.bottles, "bottle_eq": p.bottle_eq, "size_l": p.size_l,
+                       "wine_name": p.wine_name, "wine_key": p.wine_key, "parse_ok": int(p.ok)})
+    db.update_live(lid, {"current_bid": bid, "end_time": int(time.time()) + 3600, "final": 0})
+    db.commit()
+
+
+def test_mixed_lots_never_inherit_manual_values(tmp_path):
+    from cwmon.server import add_reference, remove_reference
+    from cwmon.monitor import score_all
+    cfg = load_config()
+    cfg["db_path"] = str(tmp_path / "m.db")
+    cfg["dashboard"]["cartella"] = str(tmp_path / "site")
+    db = DB(cfg["db_path"])
+    _add_lot(db, 1, "Henriot, Brut Souverain - Champagne Brut - 1 Bottiglia (0,75 L)")
+    _add_lot(db, 2, "Brut Henriot; Ruinart Pere & Fils - Champagne Brut - 4 Bottiglie (0,75 L)")
+    _add_lot(db, 3, "Henriot, Brut Souverain - Champagne Brut - 6 Bottiglie (0,75 L)")
+    add_reference(cfg, db, {"lot_id": 1, "prezzo": "36", "ogni_annata": True})
+    get = lambda i: db.conn.execute("SELECT market_per_bottle, value_source FROM lots WHERE id=?", (i,)).fetchone()
+    assert get(3)[0] == 36                      # stesso vino singolo: il valore vale
+    assert get(2)[0] is None                    # lotto misto: nessun valore ereditato
+    add_reference(cfg, db, {"lot_id": 2, "prezzo": "45", "ogni_annata": True})
+    assert get(2)[0] == 45 and "solo questo lotto" in get(2)[1]
+    assert get(1)[0] == 36 and get(3)[0] == 36  # il valore del misto non si propaga
+    assert remove_reference(cfg, db, {"lot_id": 2})["rimossi"] == 1
+    assert get(2)[0] is None
+    # valori salvati con versioni precedenti su un lotto misto: vengono limitati a quel lotto
+    mixed_key = db.conn.execute("SELECT wine_key FROM lots WHERE id=2").fetchone()[0]
+    db.conn.execute("INSERT INTO manual_values(wine_key, vintage, wine_name, name, price, lot_id, updated_at) "
+                    "VALUES(?, NULL, 'henriot brut souverain champagne brut', 'x', 99, 2, 0)", (mixed_key,))
+    db.commit()
+    score_all(cfg, db)
+    assert get(3)[0] == 36 and get(2)[0] == 99

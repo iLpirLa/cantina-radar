@@ -93,6 +93,10 @@ def collect(cfg: dict, db: DB, client: CatawikiClient) -> dict:
 def score_all(cfg: dict, db: DB) -> Valuator:
     refs = load_references(Path(cfg["_root"]) / cfg["valutazione"]["file_riferimenti"])
     vivino = {(r["wine_key"], r["vintage"]): dict(r) for r in db.conn.execute("SELECT * FROM vivino")}
+    db.conn.execute(
+        "UPDATE OR REPLACE manual_values SET wine_key='lotto:' || lot_id, vintage=NULL "
+        "WHERE lot_id IN (SELECT id FROM lots WHERE mixed=1) AND wine_key NOT LIKE 'lotto:%'")
+    db.commit()
     manual = db.conn.execute("SELECT * FROM manual_values").fetchall()
     val = Valuator(refs, db.history(int(cfg["valutazione"]["giorni_storico"])), effective_costs(cfg, db),
                    float(cfg["valutazione"]["match_minimo"]), vivino, manual)

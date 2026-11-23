@@ -38,6 +38,12 @@ _VINTAGE = r"(?:18[5-9]\d|19\d\d|20[0-4]\d)"
 _LEAD_VINTAGE_RE = re.compile(rf"^\s*({_VINTAGE})\s+")
 _MULTI_VINTAGE_RE = re.compile(rf"^\s*({_VINTAGE})\s*(?:&|,|/|and|-|e)\s*({_VINTAGE})\b", re.IGNORECASE)
 _INLINE_VINTAGE_RE = re.compile(rf"\b({_VINTAGE})\b")
+# parole che indicano un lotto con vini diversi (anche dello stesso produttore)
+_MIXED_WORDS_RE = re.compile(
+    r"\b(mix|mixed|misto|mista|misti|miste|assortit[oaie]|assortiment|assortment|selezione di|selection of|"
+    r"collezione|collection|verticale|vertical|degustazione|tasting set|cofanetto con|set di \d|lotto di vini|"
+    r"vari produttori|various|diversi|different wines?|vins divers)\b", re.I)
+_COUNT_X_RE = re.compile(r"\b\d+\s*x\s+\S", re.I)
 _NV_RE = re.compile(r"\b(?:N\.?V\.?|non[- ]vintage|sans ann[ée]e|senza annata)\b", re.IGNORECASE)
 
 # Parole da ignorare nel calcolo della chiave del vino
@@ -199,6 +205,8 @@ def parse_title(title: str, slug: str = "") -> ParsedTitle:
     if ";" in head or " / " in head or re.search(rf"\b{_VINTAGE}\b.*\b{_VINTAGE}\b", head):
         p.mixed = True
     if len(_INLINE_VINTAGE_RE.findall(t)) > 1 and not p.vintage:
+        p.mixed = True
+    if _MIXED_WORDS_RE.search(t) or len(_COUNT_X_RE.findall(t)) >= 2:
         p.mixed = True
 
     if "," in head:

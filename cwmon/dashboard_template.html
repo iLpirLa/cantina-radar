@@ -246,11 +246,14 @@ function googleUrl(l) {
 }
 function refForm(l) {
   if (!LIVE) return `<div class="src">Cerca il prezzo: ${searchLinks(l)}</div>`;
-  return `<form class="refform" data-id="${l.id}">
+  const mine = /^tuo valore/.test(l.src || "");
+  return `${mine ? `<button class="btn small" data-remove="${l.id}" title="Cancella il valore inserito da te: torneranno a valere le altre fonti">Rimuovi il mio valore</button>` : ""}
+  <form class="refform" data-id="${l.id}">
     <input type="number" name="prezzo" min="1" step="1" placeholder="€ / bott." required>
     <input type="text" name="punteggio" placeholder="es. JS 95" title="Punteggio della critica (facoltativo)">
     <button class="btn small primary">Salva</button>
-    <label><input type="checkbox" name="ogni"> vale per tutte le annate</label>
+    ${l.mix ? `<span class="src">Lotto misto: il valore medio a bottiglia che inserisci vale solo per questo lotto.</span>`
+            : `<label><input type="checkbox" name="ogni"> vale per tutte le annate</label>`}
     <span class="src">Cerca il prezzo: ${searchLinks(l)}</span>
   </form>`;
 }
@@ -291,7 +294,8 @@ function lotCard(l) {
   if (l.d == null) {
     right = `<div class="vhead"><span class="lbl m">Valore di mercato sconosciuto</span></div>
       ${costCalc(l)}
-      <div class="explain">Quanto vale una bottiglia di questo vino? Inseriscilo e l'app calcola subito lo sconto, anche per le aste future.</div>
+      <div class="explain">${l.mix ? "Lotto con vini diversi: non esiste un valore di mercato unico. Se vuoi, inserisci tu un valore medio a bottiglia per questo lotto."
+        : "Quanto vale una bottiglia di questo vino? Inseriscilo e l'app calcola subito lo sconto, anche per le aste future."}</div>
       ${refForm(l)}`;
   } else {
     const mbOk = l.mb != null && l.mb > (l.bid || 0);
@@ -301,7 +305,7 @@ function lotCard(l) {
       <div class="maxbid">${mbOk ? `Per avere almeno il ${goalPct()}% di sconto: <b>offri al massimo ${eur(l.mb)}</b>`
         : `L'offerta attuale è già oltre il limite per avere il ${goalPct()}% di sconto`}</div>
       <div class="src">Valore da: ${esc(l.src)} · affidabilità ${confLbl(l.c)}</div>
-      <details><summary class="src" style="cursor:pointer;text-decoration:underline">Correggi il valore</summary>${refForm(l)}</details>`;
+      <details><summary class="src" style="cursor:pointer;text-decoration:underline">Correggi${/^tuo valore/.test(l.src || "") ? " o rimuovi" : ""} il valore</summary>${refForm(l)}</details>`;
   }
   return `<article class="lot ${isDeal(l) ? "deal" : ""}">
     ${l.img ? `<img src="${esc(l.img)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : `<div class="ph"></div>`}
@@ -472,6 +476,12 @@ async function api(path, body) {
   } catch (e) { return { error: e.message }; }
 }
 function bindForms() {
+  document.querySelectorAll("[data-remove]").forEach(b => b.onclick = async () => {
+    if (!confirm("Rimuovere il valore inserito da te per questo vino?")) return;
+    const r = await api("/api/reference/remove", { lot_id: +b.dataset.remove });
+    if (r.error) return alert("Errore: " + r.error);
+    await reload(); toast(r.rimossi ? "✓ Valore rimosso" : "Nessun valore da rimuovere");
+  });
   document.querySelectorAll("form.refform").forEach(f => f.onsubmit = async e => {
     e.preventDefault();
     const fd = new FormData(f), btn = f.querySelector("button");

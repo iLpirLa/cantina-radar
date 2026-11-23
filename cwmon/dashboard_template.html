@@ -233,7 +233,14 @@ function searchLinks(l) {
   const name = String([l.pr, l.cu].filter(Boolean).join(" ") || l.t || "");
   const ws = `https://www.wine-searcher.com/find/${encodeURIComponent(name.toLowerCase()).replace(/%20/g, "+")}${l.v ? "/" + l.v : ""}`;
   const vv = `https://www.vivino.com/search/wines?q=${encodeURIComponent(name + (l.v ? " " + l.v : ""))}`;
-  return `<a href="${ws}" target="_blank" rel="noopener">Wine-Searcher ↗</a> · <a href="${vv}" target="_blank" rel="noopener">Vivino ↗</a>`;
+  return `<a href="${ws}" target="_blank" rel="noopener">Wine-Searcher ↗</a> · <a href="${vv}" target="_blank" rel="noopener">Vivino ↗</a> · <a href="${esc(googleUrl(l))}" target="_blank" rel="noopener">Google ↗</a>`;
+}
+function googleUrl(l) {
+  // cantina + vino + denominazione + annata (senza il numero di bottiglie), più "prezzo" per far emergere i negozi
+  let q = [l.pr, l.cu, l.ap].filter(Boolean).join(" ");
+  if (!q) q = String(l.t || "").split(/\s+[-–]\s+/).filter(x => !/\(\s*[\d.,]+\s*(cl|ml|lt|litri|litro|l)\s*\)/i.test(x)).join(" ");
+  if (l.v && !q.includes(String(l.v))) q += " " + l.v;
+  return "https://www.google.com/search?q=" + encodeURIComponent(q.replace(/"/g, "").trim() + " prezzo");
 }
 function refForm(l) {
   if (!LIVE) return `<div class="src">Cerca il prezzo: ${searchLinks(l)}</div>`;
@@ -300,7 +307,8 @@ function lotCard(l) {
       <h3><a href="${esc(l.u)}" target="_blank" rel="noopener">${esc(l.t)}</a></h3>
       <div class="chips">${chips}</div>
       <div class="meta"><span class="${soon ? "soon" : ""}">${left(l.end)}</span> · offerta attuale <b>${eur(l.bid)}</b></div>
-      <div class="actions" style="margin-top:10px"><a class="btn small" href="${esc(l.u)}" target="_blank" rel="noopener">Apri su Catawiki ↗</a></div>
+      <div class="actions" style="margin-top:10px"><a class="btn small" href="${esc(l.u)}" target="_blank" rel="noopener">Apri su Catawiki ↗</a>
+        <a class="btn small" href="${esc(googleUrl(l))}" target="_blank" rel="noopener" title="Cerca cantina, vino e annata su Google per confrontare i prezzi nei negozi online">Cerca su Google ↗</a></div>
     </div>
     <div class="verdict">${right}</div>
   </article>`;

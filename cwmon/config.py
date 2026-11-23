@@ -26,7 +26,7 @@ DEFAULTS = {
     },
     "dashboard": {"cartella": "site", "ore_max": 48},
     "browser": {"pagine": 4, "dettagli": 20},
-    "vivino": {"attivo": True, "pausa": 2.0},
+    "vivino": {"attivo": True, "pausa": 4.0, "ricerche": 12},
 }
 
 

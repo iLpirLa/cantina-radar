@@ -60,7 +60,8 @@ def build(cfg: dict, db: DB, out_dir: str | Path | None = None) -> Path:
         "costs": costs, "paesi": PAESI, "wine_types": WINE_TYPES,
         "lots": lots,
         "history": history,
-        "vivino_blocked": bool(db.get("vivino_bloccato")),
+        "vivino_blocked_until": ((db.get("vivino_bloccato") or 0) + 12 * 3600)
+                                if (db.get("vivino_bloccato") or 0) + 12 * 3600 > time.time() else 0,
     }
     data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     html = TEMPLATE.read_text(encoding="utf-8").replace("/*__DATA__*/null", data)

@@ -79,5 +79,8 @@ browser:
 vivino:
   # Cerca automaticamente il punteggio Vivino dei vini (una volta ogni 30 giorni per vino)
   attivo: true
-  # Pausa tra le ricerche, in secondi
-  pausa: 2.0
+  # Pausa tra le ricerche, in secondi (minimo 4)
+  pausa: 4.0
+  # Ricerche massime a ogni pressione del pulsante (solo vini che chiudono entro 48 ore).
+  # Se Vivino rifiuta le richieste, l'app si ferma per 12 ore.
+  ricerche: 12

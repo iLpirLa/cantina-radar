@@ -31,6 +31,8 @@ HEADERS = {
 }
 CACHE_DAYS = 30
 MISS_DAYS = 10
+COOLDOWN_HOURS = 12      # dopo un rifiuto di Vivino non si cerca per 12 ore
+PER_RUN = 12             # ricerche massime a ogni pressione del pulsante
 _lock = threading.Lock()
 _running = threading.Event()
 
@@ -176,20 +178,25 @@ def cache_get(db, key: str, vintage) -> dict | None:
     return dict(row) if row else None
 
 
-def enrich(cfg: dict, db, limit: int = 40) -> int:
+def enrich(cfg: dict, db, limit: int | None = None) -> int:
     """Cerca su Vivino i vini aperti senza punteggio in archivio. Ritorna il numero di ricerche fatte."""
     if not cfg.get("vivino", {}).get("attivo", True):
         return 0
     now = int(time.time())
+    blocked_at = db.get("vivino_bloccato") or 0
+    if blocked_at and now - blocked_at < COOLDOWN_HOURS * 3600:
+        return 0  # rispettiamo il limite di Vivino: niente richieste fino alla fine della pausa
+    limit = limit or int(cfg.get("vivino", {}).get("ricerche", PER_RUN))
     rows = db.conn.execute(
         "SELECT l.* FROM lots l LEFT JOIN vivino v ON v.wine_key=l.wine_key AND v.vintage IS l.vintage "
         "WHERE l.final=0 AND l.parse_ok=1 AND l.wine_key!='' AND COALESCE(l.category_id,443) NOT IN (437,965) "
+        "AND l.end_time IS NOT NULL AND l.end_time BETWEEN ? AND ? "
         "AND (v.wine_key IS NULL OR (v.rating IS NULL AND v.fetched_at < ?) OR v.fetched_at < ?) "
         "ORDER BY l.end_time LIMIT ?",
-        (now - MISS_DAYS * 86400, now - CACHE_DAYS * 86400, limit)).fetchall()
+        (now, now + 48 * 3600, now - MISS_DAYS * 86400, now - CACHE_DAYS * 86400, limit)).fetchall()
     if not rows:
         return 0
-    viv = Vivino(float(cfg.get("vivino", {}).get("pausa", 2.0)))
+    viv = Vivino(max(4.0, float(cfg.get("vivino", {}).get("pausa", 4.0))))
     done, seen = 0, set()
     for lot in rows:
         k = (lot["wine_key"], lot["vintage"])
@@ -207,6 +214,9 @@ def enrich(cfg: dict, db, limit: int = 40) -> int:
         if viv.blocked:
             db.set("vivino_bloccato", int(time.time()))
             break
+        if blocked_at:
+            db.set("vivino_bloccato", 0)  # Vivino risponde di nuovo: via l'avviso
+            blocked_at = 0
         h = best_match(lot, hits)
         db.conn.execute(
             "INSERT OR REPLACE INTO vivino(wine_key, vintage, query, name, year, rating, rating_count, price, "

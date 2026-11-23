@@ -230,7 +230,7 @@ function sortRows(rows) {
   return rows.sort(by[ui.sort]);
 }
 function searchLinks(l) {
-  const name = [l.pr, l.cu].filter(Boolean).join(" ") || l.t;
+  const name = String([l.pr, l.cu].filter(Boolean).join(" ") || l.t || "");
   const ws = `https://www.wine-searcher.com/find/${encodeURIComponent(name.toLowerCase()).replace(/%20/g, "+")}${l.v ? "/" + l.v : ""}`;
   const vv = `https://www.vivino.com/search/wines?q=${encodeURIComponent(name + (l.v ? " " + l.v : ""))}`;
   return `<a href="${ws}" target="_blank" rel="noopener">Wine-Searcher ↗</a> · <a href="${vv}" target="_blank" rel="noopener">Vivino ↗</a>`;
@@ -246,15 +246,15 @@ function refForm(l) {
   </form>`;
 }
 function costCalc(l) {
-  const C = DATA.costs, bid = l.bid || 0, bt = l.bt || 1, eq = l.eq || 0;
+  const C = DATA.costs, bid = Number(l.bid) || 0, bt = Number(l.bt) || 1, eq = Number(l.eq) || 0;
   const fp = l.fp ?? C.commissione_pct, ff = l.ff ?? C.commissione_fissa;
   const sl = l.sl ?? C.spedizione_lotto, sx = l.sx ?? C.spedizione_extra_bottiglia;
-  const fee = bid * fp + ff;
-  const ship = sl + Math.max(0, bt - 1) * sx;
+  const fee = bid * Number(fp) + Number(ff);
+  const ship = Number(sl) + Math.max(0, bt - 1) * Number(sx);
   const fromCw = l.ss === "catawiki", feeCw = l.fs === "catawiki";
   const tot = bid + fee + ship;
   const paese = (DATA.paesi || {})[C.paese] || C.paese;
-  const e2 = v => "€ " + (Number.isInteger(v) ? v.toLocaleString("it-IT") : v.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  const e2 = v => (v = Number(v) || 0, "€ " + (Number.isInteger(v) ? v.toLocaleString("it-IT") : v.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })));
   const rows = [
     `<div class="r"><span><span class="op"></span>Offerta attuale</span><span>${e2(bid)}</span></div>`,
     `<div class="r" title="${feeCw ? "Letta dalla pagina del lotto su Catawiki" : "Tariffa Buyer Protection pubblicata da Catawiki: 9% dell'offerta + 3 €"}"><span><span class="op">+</span>Commissione Catawiki (${+(fp * 100).toFixed(1)}% + ${e2(ff)})</span><span>${e2(Math.round(fee * 100) / 100)}</span></div>`,
@@ -272,7 +272,7 @@ function lotCard(l) {
     l.v ? `<span class="chip">${l.v}</span>` : "",
     l.bt ? `<span class="chip">${l.bt} ${l.bt === 1 ? "bottiglia" : "bottiglie"}${l.eq && l.eq !== l.bt ? ` (= ${String(l.eq).replace(".", ",")} da 0,75 L)` : ""}</span>` : "",
     l.ty ? `<span class="chip">${esc((DATA.wine_types || {})[l.ty] || l.ty)}</span>` : (l.cat && SPIRITS.has(l.cat) ? `<span class="chip">${esc(l.cat)}</span>` : ""),
-    l.rt ? `<a class="chip star" href="${esc(l.ru || "#")}" target="_blank" rel="noopener" title="Valutazione media degli utenti Vivino">★ ${l.rt.toFixed(1).replace(".", ",")} Vivino${l.rc ? ` · ${l.rc.toLocaleString("it-IT")} voti` : ""}</a>` : "",
+    l.rt ? `<a class="chip star" href="${esc(l.ru || "#")}" target="_blank" rel="noopener" title="Valutazione media degli utenti Vivino">★ ${Number(l.rt).toFixed(1).replace(".", ",")} Vivino${l.rc ? ` · ${Number(l.rc).toLocaleString("it-IT")} voti` : ""}</a>` : "",
     l.cs ? `<span class="chip critic" title="Punteggio della critica inserito da te">✎ ${esc(l.cs)}</span>` : "",
     l.mix ? `<span class="chip warn">lotto misto</span>` : "",
     l.po ? `<span class="chip warn" title="Il venditore non spedisce: il lotto va ritirato di persona">solo ritiro</span>` : "",
@@ -332,14 +332,22 @@ function dealDiag() {
   if (val.length) parts.push(`miglior sconto attuale ${pct(best.d)}`);
   return parts.join(" · ");
 }
+function safeCard(l) {
+  try { return lotCard(l); }
+  catch (e) {
+    console.error("Cantina Radar: errore nella scheda", l, e);
+    return `<article class="lot"><div class="ph"></div><div><h3><a href="${esc(l.u)}" target="_blank" rel="noopener">${esc(l.t || "Lotto " + l.id)}</a></h3>
+      <div class="meta">Questa scheda non si è potuta mostrare (lotto ${esc(l.id)}: ${esc(e.message)}). Segnalalo a chi ti assiste.</div></div><div></div></article>`;
+  }
+}
 function refreshList() {
   const r = sortRows(currentRows().filter(baseFilter));
-  let html = r.length ? r.slice(0, 300).map(lotCard).join("") : `<div class="empty">${emptyMsg}</div>`;
+  let html = r.length ? r.slice(0, 300).map(safeCard).join("") : `<div class="empty">${emptyMsg}</div>`;
   if (extraRows) {
     const x = sortRows(extraRows().filter(baseFilter));
     if (x.length) html += `<h3 style="font:600 18px var(--serif);color:var(--gold);margin:26px 0 4px">Da verificare (${x.length})</h3>
       <p class="hint">Superano il tuo sconto, ma il valore di mercato è solo indicativo: viene da un'unica fonte indiretta (spesso il prezzo da negozio su Vivino, di solito più alto dei prezzi in asta), oppure il venditore ha una riserva non ancora raggiunta. Controlla il prezzo e, se ti torna, salvalo con “Correggi il valore”: il lotto passerà tra le occasioni.</p>` +
-      x.slice(0, 100).map(lotCard).join("");
+      x.slice(0, 100).map(safeCard).join("");
   }
   $("#list").innerHTML = html;
   bindForms(); counts();
@@ -380,7 +388,7 @@ function render() {
         : `Ancora nessun lotto. Apri le aste di vino su Catawiki e premi il pulsante <b>🍷 Cantina Radar</b> nei preferiti
         (<a href="installa.html">come installarlo</a>).`,
       `Aste aperte che rispettano il tuo obiettivo: sconto ≥ ${goalPct()}%${rateTxt}${s.budget_massimo ? `, offerta ≤ ${eur(s.budget_massimo)}` : ""}, valore affidabile e riserva raggiunta.`,
-      isMaybe);
+      () => DATA.lots.filter(isMaybe));
   } else if (tab === "all") {
     renderList(() => DATA.lots.filter(isOpen), "Nessun lotto aperto.", "Tutti i lotti letti dal pulsante e ancora in asta, con il loro giudizio.");
   } else if (tab === "todo") {
@@ -485,7 +493,8 @@ function header() {
   const lr = DATA.last_run || {};
   $("#status").textContent = `Ultima lettura da Catawiki: ${lr.quando || "mai"}${lr.lotti != null ? ` (${lr.lotti} lotti)` : ""} · ${DATA.lots.filter(isOpen).length} aste aperte tracciate`;
   if (!LIVE) $("#installBtn").hidden = true;
-  $("#banner").innerHTML = DATA.vivino_blocked ? `<div class="banner">Vivino ha rifiutato le ultime richieste: i punteggi non si aggiornano. L'app riproverà più tardi.</div>` : "";
+  const vb = DATA.vivino_blocked_until;
+  $("#banner").innerHTML = vb && vb > now() ? `<div class="banner">Vivino ha limitato le richieste: la ricerca dei punteggi è in pausa fino alle ${new Date(vb * 1000).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}. I punteggi già trovati restano visibili.</div>` : "";
 }
 async function reload() {
   if (!LIVE) return;

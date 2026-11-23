@@ -51,6 +51,8 @@ def build(cfg: dict, db: DB, out_dir: str | Path | None = None) -> Path:
             "end": r["end_time"], "bid": r["current_bid"], "eq": r["bottle_eq"], "v": r["vintage"],
             "ppb": round((r["current_bid"] * (1 + fee) + fix) / r["bottle_eq"], 2) if r["bottle_eq"] else None,
             "cat": CATEGORIES.get(r["category_id"], ""),
+            "ty": wine_type(r["title"] or "", r["category_id"]), "pr": r["producer"] or "", "bt": r["bottles"],
+            "mix": r["mixed"],
         })
     payload = {
         "generated": int(time.time()), "stats": db.stats(), "last_run": db.get("last_run", {}),

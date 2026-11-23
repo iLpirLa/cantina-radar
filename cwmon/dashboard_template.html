@@ -413,16 +413,82 @@ function render() {
   else renderHelp();
 }
 
+const hui = { q: "", prod: "", type: "", yFrom: "", yTo: "", dFrom: "", dTo: "", pMin: "", pMax: "", basis: "lot", sort: "recent", noSpirits: true };
+function histFiltered() {
+  const dFrom = hui.dFrom ? new Date(hui.dFrom + "T00:00:00").getTime() / 1000 : null;
+  const dTo = hui.dTo ? new Date(hui.dTo + "T23:59:59").getTime() / 1000 : null;
+  const q = hui.q.toLowerCase(), prod = hui.prod.toLowerCase();
+  const rows = DATA.history.filter(h => {
+    if (hui.noSpirits && SPIRITS.has(h.cat)) return false;
+    if (q && !((h.t || "").toLowerCase().includes(q) || String(h.v || "").includes(q))) return false;
+    if (prod && !(h.pr || "").toLowerCase().includes(prod)) return false;
+    if (hui.type && (h.ty || "") !== (hui.type === "nd" ? "" : hui.type)) return false;
+    if (hui.yFrom && (!h.v || h.v < +hui.yFrom)) return false;
+    if (hui.yTo && (!h.v || h.v > +hui.yTo)) return false;
+    if (dFrom && (!h.end || h.end < dFrom)) return false;
+    if (dTo && (!h.end || h.end > dTo)) return false;
+    const price = hui.basis === "bottle" ? h.ppb : h.bid;
+    if (hui.pMin && (price == null || price < +hui.pMin)) return false;
+    if (hui.pMax && (price == null || price > +hui.pMax)) return false;
+    return true;
+  });
+  const by = { recent: (a, b) => (b.end || 0) - (a.end || 0), old: (a, b) => (a.end || 0) - (b.end || 0),
+               pdesc: (a, b) => (b.bid || 0) - (a.bid || 0), pasc: (a, b) => (a.bid || 0) - (b.bid || 0),
+               bdesc: (a, b) => (b.ppb || 0) - (a.ppb || 0), basc: (a, b) => (a.ppb || 0) - (b.ppb || 0),
+               vint: (a, b) => (b.v || 0) - (a.v || 0) };
+  return rows.sort(by[hui.sort] || by.recent);
+}
+function median(a) { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+function histTable() {
+  const R = histFiltered(), H = DATA.history;
+  const ppb = R.map(h => h.ppb).filter(v => v != null);
+  const med = median(ppb), mn = ppb.length ? Math.min(...ppb) : null, mx = ppb.length ? Math.max(...ppb) : null;
+  $("#hSummary").innerHTML = H.length ? `<b>${R.length}</b> vendite su ${H.length}` +
+    (ppb.length ? ` · prezzo a bottiglia: mediano <b>${eur(med)}</b> (da ${eur(mn)} a ${eur(mx)})` : "") : "";
+  $("#hTable").innerHTML = !H.length ? `<div class="empty">Ancora nessuna vendita registrata.</div>`
+    : !R.length ? `<div class="empty">Nessuna vendita con questi filtri.</div>`
+    : `<div class="card" style="padding:6px 10px;overflow-x:auto"><table><thead><tr><th>Chiusa il</th><th>Vino</th><th>Tipologia</th><th class="num">Prezzo finale</th><th class="num">€ a bottiglia</th></tr></thead><tbody>
+      ${R.slice(0, 1000).map(h => `<tr><td>${h.end ? new Date(h.end * 1000).toLocaleDateString("it-IT") : "–"}</td>
+        <td>${h.u ? `<a href="${esc(h.u)}" target="_blank" rel="noopener">${esc(h.t)}</a>` : esc(h.t) + ' <span class="src">(importato)</span>'}${h.mix ? ' <span class="chip warn">misto</span>' : ""}</td>
+        <td class="src">${esc((DATA.wine_types || {})[h.ty || ""] || "")}</td>
+        <td class="num">${eur(h.bid)}</td><td class="num">${eur(h.ppb)}</td></tr>`).join("")}
+    </tbody></table></div>`;
+}
 function renderHistory() {
-  const H = DATA.history;
+  const H = DATA.history, TY = DATA.wine_types || {};
+  const producers = [...new Set(H.map(h => (h.pr || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "it"));
+  const types = ["rosso", "bianco", "rosato", "spumante", "dolce", ""].filter(k => H.some(h => (h.ty || "") === k));
   $("#view").innerHTML = `
     <p class="hint">Aste chiuse e vendute registrate dall'app. Servono a stimare il valore dei lotti futuri dello stesso vino e annata.
     Il prezzo a bottiglia è il prezzo finale più la commissione, diviso per le bottiglie da 0,75 L.</p>
-    ${H.length ? `<div class="card" style="padding:6px 10px;overflow-x:auto"><table><thead><tr><th>Chiusa il</th><th>Vino</th><th class="num">Prezzo finale</th><th class="num">€ a bottiglia</th></tr></thead><tbody>
-      ${H.map(h => `<tr><td>${h.end ? new Date(h.end * 1000).toLocaleDateString("it-IT") : "–"}</td>
-        <td>${h.u ? `<a href="${esc(h.u)}" target="_blank" rel="noopener">${esc(h.t)}</a>` : esc(h.t) + ' <span class="src">(importato)</span>'}</td>
-        <td class="num">${eur(h.bid)}</td><td class="num">${eur(h.ppb)}</td></tr>`).join("")}
-    </tbody></table></div>` : `<div class="empty">Ancora nessuna vendita registrata.</div>`}
+    <div class="tools">
+      <input type="search" id="hq" placeholder="Cerca vino, denominazione, annata…">
+      <input type="search" id="hprod" list="hprodList" placeholder="Produttore" style="max-width:220px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px">
+      <datalist id="hprodList">${producers.map(p => `<option value="${esc(p)}">`).join("")}</datalist>
+      <select id="htype"><option value="">Tutte le tipologie</option>${types.map(k => `<option value="${k || "nd"}">${esc(TY[k] || k)}</option>`).join("")}</select>
+      <span class="meta">Annata</span>
+      <input class="yr" type="number" id="hyFrom" placeholder="dal" min="1850" max="2100">
+      <input class="yr" type="number" id="hyTo" placeholder="al" min="1850" max="2100">
+    </div>
+    <div class="tools">
+      <span class="meta">Chiusa</span>
+      <input class="yr" type="date" id="hdFrom" style="width:150px" title="Chiusa dal">
+      <input class="yr" type="date" id="hdTo" style="width:150px" title="Chiusa al">
+      <span class="meta">Prezzo</span>
+      <select id="hbasis" title="Su cosa applicare il filtro di prezzo"><option value="lot">finale del lotto</option><option value="bottle">a bottiglia</option></select>
+      <input class="yr" type="number" id="hpMin" placeholder="min €" min="0">
+      <input class="yr" type="number" id="hpMax" placeholder="max €" min="0">
+      <select id="hsort">
+        <option value="recent">Più recenti</option><option value="old">Meno recenti</option>
+        <option value="pdesc">Prezzo finale ↓</option><option value="pasc">Prezzo finale ↑</option>
+        <option value="bdesc">€ a bottiglia ↓</option><option value="basc">€ a bottiglia ↑</option>
+        <option value="vint">Annata ↓</option>
+      </select>
+      <label class="toggle"><input type="checkbox" id="hnoSpirits"> Nascondi distillati</label>
+      <button class="btn small" id="hreset">Azzera filtri</button>
+    </div>
+    <p class="hint" id="hSummary"></p>
+    <div id="hTable"></div>
     <div class="card">
       <h3>Come aggiungere dati storici</h3>
       <ul>
@@ -434,6 +500,16 @@ function renderHistory() {
       <div class="row2"><input type="file" id="csvFile" accept=".csv,text/csv,text/plain">
       <button class="btn small primary" id="csvGo">Importa</button><span class="saved" id="csvRes"></span></div>` : ""}
     </div>`;
+  const bind = { hq: "q", hprod: "prod", htype: "type", hyFrom: "yFrom", hyTo: "yTo", hdFrom: "dFrom", hdTo: "dTo",
+                 hpMin: "pMin", hpMax: "pMax", hbasis: "basis", hsort: "sort" };
+  Object.entries(bind).forEach(([id, k]) => {
+    const el = document.getElementById(id); el.value = hui[k];
+    el.addEventListener(el.tagName === "SELECT" || el.type === "date" ? "change" : "input", e => { hui[k] = e.target.value; histTable(); });
+  });
+  $("#hnoSpirits").checked = hui.noSpirits;
+  $("#hnoSpirits").onchange = e => { hui.noSpirits = e.target.checked; histTable(); };
+  $("#hreset").onclick = () => { Object.assign(hui, { q: "", prod: "", type: "", yFrom: "", yTo: "", dFrom: "", dTo: "", pMin: "", pMax: "", basis: "lot", sort: "recent" }); renderHistory(); };
+  histTable();
   if (!LIVE) return;
   $("#csvFile").onchange = async e => { const f = e.target.files[0]; if (f) $("#csv").value = await f.text(); };
   $("#csvGo").onclick = async () => {
@@ -530,14 +606,15 @@ async function reload() {
     if (r.ok) DATA = await r.json();
   } catch (e) {}
   header(); fillGoal();
-  if (tab === "hist" || tab === "help") counts(); else render();
+  if (tab === "hist") { counts(); if (document.getElementById("hTable")) histTable(); }
+  else if (tab === "help") counts(); else render();
 }
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
   tab = b.dataset.t; history.replaceState(null, "", "?tab=" + tab); render();
 });
 header(); fillGoal(); render();
 if (LIVE) setInterval(() => {
-  const busy = document.querySelector("form.refform input:focus, #csv:focus, .goal input:focus, .goal select:focus, details[open], .tools input:focus");
+  const busy = document.querySelector("form.refform input:focus, #csv:focus, .goal input:focus, .goal select:focus, details[open], .tools input:focus, .tools select:focus");
   if (!busy) reload();
 }, 30000);
 </script>

@@ -286,10 +286,14 @@ def test_settings_reference_and_csv(tmp_path):
     s = update_settings(cfg, db, {"sconto_minimo": 0.3, "punteggio_minimo": 4.2, "budget_massimo": 500})
     assert s["sconto_minimo"] == 0.3 and s["punteggio_minimo"] == 4.2
     r = add_reference(cfg, db, {"lot_id": 7, "prezzo": "200", "punteggio": "JS 97"})
-    assert r["sconto"] > 0.3
+    assert r["sconto"] > 0.3 and r["valore"] == 200
     lot = db.conn.execute("SELECT * FROM lots WHERE id=7").fetchone()
-    assert lot["market_per_bottle"] == 200 and lot["critic_score"] == "JS 97"
-    assert "Giacosa" in (root / "riferimenti.csv").read_text(encoding="utf-8")
+    assert lot["market_per_bottle"] == 200 and lot["critic_score"] == "JS 97" and lot["value_source"] == "tuo valore"
+    assert "Giacosa" in (root / "data" / "valori_inseriti.csv").read_text(encoding="utf-8")
+    # il valore manuale vince anche su altre fonti (qui un riferimento CSV diverso) e si può correggere
+    (root / "riferimenti.csv").write_text("Bruno Giacosa Falletto Barolo,2016,500,x,,\n", encoding="utf-8")  # senza intestazione
+    add_reference(cfg, db, {"lot_id": 7, "prezzo": "180"})
+    assert db.conn.execute("SELECT market_per_bottle FROM lots WHERE id=7").fetchone()[0] == 180
     res = import_history_csv(cfg, db, "titolo;prezzo_finale;data\n" + title + ";150;01/11/2026\nriga senza prezzo;;\n")
     assert res == {"importati": 1, "scartati": 1}
     assert len(db.sold_history()) == 1

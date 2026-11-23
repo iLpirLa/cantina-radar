@@ -93,8 +93,9 @@ def collect(cfg: dict, db: DB, client: CatawikiClient) -> dict:
 def score_all(cfg: dict, db: DB) -> Valuator:
     refs = load_references(Path(cfg["_root"]) / cfg["valutazione"]["file_riferimenti"])
     vivino = {(r["wine_key"], r["vintage"]): dict(r) for r in db.conn.execute("SELECT * FROM vivino")}
+    manual = db.conn.execute("SELECT * FROM manual_values").fetchall()
     val = Valuator(refs, db.history(int(cfg["valutazione"]["giorni_storico"])), effective_costs(cfg, db),
-                   float(cfg["valutazione"]["match_minimo"]), vivino)
+                   float(cfg["valutazione"]["match_minimo"]), vivino, manual)
     target = float(effective_alert_cfg(cfg, db)["sconto_minimo"])
     for lot in db.open_lots():
         s = val.score(lot, target)

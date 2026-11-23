@@ -17,7 +17,7 @@ Valuta le aste di vino, Champagne e vini dolci che stai guardando su Catawiki e 
 - **Filtri**: ricerca libera, **tipologia** (rosso, bianco, rosato, spumante, dolce e fortificato: ricavata dal titolo), **annata** da… a…, ordinamento e "Nascondi distillati".
 - **🔥 Occasioni**: le aste che rispettano il tuo obiettivo.
 - **Tutti i lotti**: ogni lotto letto, con il giudizio (*Affare*, *Interessante*, *Prezzo di mercato*, *Sopra il mercato*).
-- **Da valutare**: i vini di cui l'app non conosce ancora il valore. Scrivi il prezzo a bottiglia direttamente lì: c'è il link per cercarlo su Wine-Searcher e Vivino. Viene salvato in `riferimenti.csv` e usato anche per le aste future.
+- **Da valutare**: i vini di cui l'app non conosce ancora il valore. Scrivi il prezzo a bottiglia direttamente lì: ci sono i link per cercarlo su Wine-Searcher, Vivino e Google. Il valore che inserisci (anche con **Correggi il valore**) ha sempre la precedenza sulle altre fonti, vale per quel vino e quell'annata anche nelle aste future e viene salvato nel database dell'app. Una copia leggibile finisce in `data/valori_inseriti.csv`.
 - **Storico vendite**: le aste chiuse registrate, più un riquadro per importare un tuo CSV di vendite passate.
 - **Come funziona**: la spiegazione di ogni voce.
 

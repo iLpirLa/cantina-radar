@@ -100,6 +100,8 @@
   dl{display:grid;grid-template-columns:200px 1fr;gap:10px 18px;margin:0}
   dt{font-weight:600} dd{margin:0;color:var(--mute)}
   footer{color:var(--faint);font-size:12px;padding:24px 0 40px}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f3a2b;border:1px solid #3f6650;color:#d9f5e4;
+         padding:12px 18px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.4);z-index:50;max-width:92vw;font-size:14px}
   .banner{background:#2b2015;border:1px solid #5b4528;color:#f0cf9a;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:14px}
 
   @media (max-width:860px){
@@ -444,7 +446,7 @@ function renderHelp() {
     <dt>Sconto (es. −38%)</dt><dd>Quanto risparmieresti rispetto al valore di mercato se vincessi all'offerta attuale, già al netto di commissione e spedizione. <b>+12%</b> significa che pagheresti il 12% in più del suo valore.</dd>
     <dt>Affare, Interessante…</dt><dd><b>Affare</b>: sconto pari o superiore al tuo obiettivo. <b>Interessante</b>: almeno metà del tuo obiettivo. <b>Prezzo di mercato</b>: più o meno quanto vale. <b>Sopra il mercato</b>: costa più di quanto vale.</dd>
     <dt>Costo a bottiglia</dt><dd>Offerta + commissione Catawiki (tariffa pubblicata: 9% + 3 €) + spedizione, diviso per le bottiglie da 0,75 L (una magnum conta come 2). La spedizione viene letta da Catawiki (segno ✓). Catawiki la carica con una richiesta separata: per insegnare al pulsante a leggerla, apri una volta la pagina di un lotto, scorri fino alla sezione della spedizione e premi il pulsante lì. Finché non è letta, si usa la stima verso il paese scelto (segno ⚠) (${eur(DATA.costs.spedizione_lotto)} a lotto + ${eur(DATA.costs.spedizione_extra_bottiglia)} per ogni bottiglia in più, modificabile nel riquadro "Il tuo obiettivo"), diviso per le bottiglie da 0,75 L. Una magnum conta come 2.</dd>
-    <dt>Valore di mercato</dt><dd>Quanto vale una bottiglia. Fonti, dalla più affidabile: i prezzi che inserisci tu, lo storico delle aste Catawiki chiuse, il prezzo Vivino, la stima dell'esperto Catawiki.</dd>
+    <dt>Valore di mercato</dt><dd>Quanto vale una bottiglia. Se lo inserisci tu (con "Correggi il valore" o nella scheda Da valutare) vale sempre il tuo, per quel vino e quell'annata, anche nelle aste future. Altrimenti l'app combina il file riferimenti.csv, lo storico delle aste Catawiki chiuse e il prezzo Vivino.</dd>
     <dt>Affidabilità</dt><dd>Quanto è solida la stima del valore. <b>Alta</b> se viene da un tuo prezzo o da più vendite simili, <b>bassa</b> se si basa su un solo dato indiretto. Le occasioni richiedono almeno un'affidabilità media.</dd>
     <dt>Offri al massimo</dt><dd>L'offerta oltre la quale lo sconto scende sotto il tuo obiettivo. È il numero da tenere a mente quando rilanci negli ultimi minuti.</dd>
     <dt>★ Vivino</dt><dd>Valutazione media degli utenti Vivino (scala 1–5) e numero di voti. Sopra 4,0 è un vino molto apprezzato, sopra 4,3 eccellente. Clicca il punteggio per aprire la scheda su Vivino.</dd>
@@ -458,6 +460,11 @@ function renderHelp() {
   </ol></div>`;
 }
 
+function toast(msg) {
+  document.querySelectorAll(".toast").forEach(t => t.remove());
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 6000);
+}
 async function api(path, body) {
   try {
     const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -472,6 +479,8 @@ function bindForms() {
     const r = await api("/api/reference", { lot_id: +f.dataset.id, prezzo: fd.get("prezzo"), punteggio: fd.get("punteggio"), ogni_annata: !!fd.get("ogni") });
     if (r.error) { alert("Errore: " + r.error); btn.disabled = false; btn.textContent = "Salva"; return; }
     await reload();
+    toast(`✓ Valore salvato: ${eur(r.prezzo)} a bottiglia per ${r.vino}${r.annata ? " " + r.annata : " (tutte le annate)"}` +
+          (r.sconto != null ? ` · sconto attuale ${pct(r.sconto)}` : ""));
   });
 }
 function fillGoal() {

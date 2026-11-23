@@ -217,31 +217,45 @@ def update_settings(cfg: dict, db: DB, data: dict) -> dict:
 
 
 def add_reference(cfg: dict, db: DB, data: dict) -> dict:
-    """Aggiunge un prezzo di riferimento (per bottiglia 0,75 L) a riferimenti.csv partendo da un lotto."""
+    """Salva il valore di mercato (per bottiglia 0,75 L) che inserisci dalla dashboard per un vino.
+    Ha sempre la precedenza sulle altre fonti e vale anche per le aste future dello stesso vino/annata."""
     import csv
     from .monitor import score_all
     from .dashboard import build
     lot = db.conn.execute("SELECT * FROM lots WHERE id=?", (int(data.get("lot_id") or 0),)).fetchone()
     if not lot:
         raise ValueError("lotto non trovato")
-    price = float(str(data.get("prezzo") or "").replace(",", ".").replace("€", "").strip())
+    try:
+        price = float(str(data.get("prezzo") or "").replace(",", ".").replace("€", "").strip())
+    except ValueError:
+        raise ValueError("prezzo non valido") from None
     if not 1 <= price <= 1_000_000:
         raise ValueError("prezzo non valido")
+    key = lot["wine_key"] or f"lotto:{lot['id']}"   # lotti non interpretabili: valore legato al singolo lotto
+    vintage = None if data.get("ogni_annata") else lot["vintage"]
     name = " ".join(x for x in (lot["producer"], lot["cuvee"], lot["appellation"]) if x).strip() or lot["title"]
-    vintage = "" if data.get("ogni_annata") else (lot["vintage"] or "")
     score = str(data.get("punteggio") or "").strip()[:40]
-    path = Path(cfg["_root"]) / cfg["valutazione"]["file_riferimenti"]
-    new_file = not path.exists()
-    with path.open("a", encoding="utf-8", newline="") as f:
-        w = csv.writer(f)
-        if new_file:
-            w.writerow(["vino", "annata", "prezzo_bottiglia", "fonte", "punteggio", "note"])
-        w.writerow([name, vintage, f"{price:g}", str(data.get("fonte") or "dashboard")[:40], score,
-                    f"lotto {lot['id']}"])
+    db.conn.execute(
+        "INSERT OR REPLACE INTO manual_values(wine_key, vintage, wine_name, name, price, score, lot_id, updated_at) "
+        "VALUES(?,?,?,?,?,?,?,?)", (key, vintage, lot["wine_name"] or "", name, price, score, lot["id"], int(time.time())))
+    if key.startswith("lotto:"):
+        db.conn.execute("UPDATE lots SET wine_key=? WHERE id=?", (key, lot["id"]))
+    db.commit()
+    # copia leggibile, solo per consultazione
+    try:
+        path = Path(cfg["db_path"]).parent / "valori_inseriti.csv"
+        new = not path.exists()
+        with path.open("a", encoding="utf-8", newline="") as f:
+            w = csv.writer(f)
+            if new:
+                w.writerow(["data", "vino", "annata", "prezzo_bottiglia", "punteggio", "lotto"])
+            w.writerow([time.strftime("%d/%m/%Y %H:%M"), name, vintage or "tutte", f"{price:g}", score, lot["id"]])
+    except OSError:
+        pass
     score_all(cfg, db)
     build(cfg, db)
     row = db.conn.execute("SELECT discount, market_per_bottle FROM lots WHERE id=?", (lot["id"],)).fetchone()
-    return {"vino": name, "annata": vintage, "prezzo": price, "sconto": row["discount"]}
+    return {"vino": name, "annata": vintage, "prezzo": price, "valore": row["market_per_bottle"], "sconto": row["discount"]}
 
 
 def import_history_csv(cfg: dict, db: DB, text: str) -> dict:

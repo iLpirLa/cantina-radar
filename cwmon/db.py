@@ -73,6 +73,18 @@ CREATE TABLE IF NOT EXISTS vivino (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_vivino ON vivino(wine_key, COALESCE(vintage, 0));
 
+CREATE TABLE IF NOT EXISTS manual_values (
+    wine_key   TEXT,
+    vintage    INTEGER,          -- NULL = vale per tutte le annate
+    wine_name  TEXT,
+    name       TEXT,
+    price      REAL,
+    score      TEXT,
+    lot_id     INTEGER,
+    updated_at INTEGER
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_manual ON manual_values(wine_key, COALESCE(vintage, -1));
+
 CREATE TABLE IF NOT EXISTS kv (
     key   TEXT PRIMARY KEY,
     value TEXT

@@ -37,8 +37,13 @@ def load_references(path: str | Path) -> list[Reference]:
     if not path.exists():
         return []
     refs = []
+    fields = ["vino", "annata", "prezzo_bottiglia", "fonte", "punteggio", "note"]
     with path.open(encoding="utf-8-sig", newline="") as f:
-        for row in csv.DictReader(f):
+        first = f.readline()
+        f.seek(0)
+        has_header = "prezzo" in first.lower() or "vino" in first.lower().split(",")[0]
+        reader = csv.DictReader(f) if has_header else csv.DictReader(f, fieldnames=fields)
+        for row in reader:
             name = (row.get("vino") or "").strip()
             try:
                 price = float(str(row.get("prezzo_bottiglia") or "").replace(",", ".").replace("€", "").strip())
@@ -82,9 +87,12 @@ def max_bid_for(target_per_bottle: float, bottle_eq: float, bottles: int, costs:
 
 class Valuator:
     def __init__(self, refs: list[Reference], history_rows, costs: dict, match_min: float = 88,
-                 vivino: dict | None = None):
+                 vivino: dict | None = None, manual: list | None = None):
         self.refs = refs
         self.vivino = vivino or {}
+        self.manual = [dict(m) for m in (manual or [])]
+        self._manual_key = {(m["wine_key"], m["vintage"]): m for m in self.manual}
+        self._manual_lot = {m["lot_id"]: m for m in self.manual if m.get("lot_id")}
         self.costs = costs
         self.match_min = match_min
         # storico: per ogni vendita, prezzo pagato per bottiglia (commissione inclusa)
@@ -109,6 +117,21 @@ class Valuator:
                 self._by_token.setdefault(h["name"].split()[0], []).append(h)
 
     # ----------------------------------------------------------------- fonti
+    def manual_for(self, lot) -> dict | None:
+        """Valore inserito da te dalla dashboard: stessa chiave e annata, poi 'tutte le annate', poi nome simile."""
+        m = (self._manual_key.get((lot["wine_key"], lot["vintage"])) or self._manual_key.get((lot["wine_key"], None))
+             or self._manual_lot.get(lot["id"]))
+        if m:
+            return m
+        best, best_s = None, 0.0
+        for c in self.manual:
+            if c["vintage"] is not None and c["vintage"] != lot["vintage"]:
+                continue
+            s = similarity(lot["wine_name"], c["wine_name"] or "")
+            if s >= max(self.match_min, 92) and s > best_s:
+                best, best_s = c, s
+        return best
+
     def match_ref(self, lot) -> Reference | None:
         best, best_s = None, 0.0
         for ref in self.refs:
@@ -193,6 +216,10 @@ class Valuator:
 
     # ------------------------------------------------------------ valutazione
     def market_value(self, lot) -> dict | None:
+        m = self.manual_for(lot)
+        if m:  # il tuo valore ha sempre la precedenza: niente medie con altre fonti
+            return {"value": float(m["price"]), "conf": 0.95,
+                    "src": "tuo valore" + ("" if m["vintage"] is not None else " (tutte le annate)")}
         if not lot["parse_ok"]:
             # lotti misti o non interpretabili: solo stima esperto
             return self._from_estimate(lot)
@@ -214,9 +241,13 @@ class Valuator:
         v = self.vivino.get((lot["wine_key"], lot["vintage"]))
         if v and v.get("rating"):
             out.update(rating=v["rating"], rating_count=v.get("rating_count"), rating_url=v.get("url"))
-        ref = self.match_ref(lot) if lot["parse_ok"] else None
-        if ref and ref.score:
-            out["critic_score"] = ref.score
+        m = self.manual_for(lot)
+        if m and m.get("score"):
+            out["critic_score"] = m["score"]
+        else:
+            ref = self.match_ref(lot) if lot["parse_ok"] else None
+            if ref and ref.score:
+                out["critic_score"] = ref.score
         return out
 
     def score(self, lot, target_discount: float) -> dict | None:

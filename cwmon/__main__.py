@@ -113,6 +113,11 @@ def start(cfg: dict, minutes: int, port: int, lan: bool) -> None:
         except OSError:
             pass
     print(f"  Pulsante per Catawiki: {url}installa.html")
+    if lan:
+        from .server import _mdns_name
+        host = _mdns_name()
+        if host:
+            print(f"  Pulsante sul telefono: http://{host}:{port}/installa.html")
     if cfg["telegram"]["token"]:
         threading.Thread(target=run_bot, args=(cfg,), daemon=True).start()
         print("  Bot Telegram: attivo")

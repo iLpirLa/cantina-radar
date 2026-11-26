@@ -25,7 +25,7 @@ DEFAULTS = {
         "ultima_chiamata_minuti": 45, "includi": [], "escludi": [], "punteggio_minimo": 0,
     },
     "dashboard": {"cartella": "site", "ore_max": 48},
-    "browser": {"pagine": 4, "dettagli": 20},
+    "browser": {"pagine": 30, "dettagli": 60},
     "vivino": {"attivo": True, "pausa": 4.0, "ricerche": 12},
 }
 

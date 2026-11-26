@@ -248,7 +248,8 @@ def test_bookmarklet_generation(tmp_path):
     cfg["dashboard"]["cartella"] = str(tmp_path / "site")
     site = write_static(cfg, 8000)
     html = (site / "installa.html").read_text(encoding="utf-8")
-    assert "javascript:" in html and "__ORIGIN__" not in html and "__PAGES__" not in html
+    assert "__BOOKMARKLET_JS__" not in html and "__PAGES__" not in html and "__DETAILS__" not in html
+    assert "__HOST__" not in html and "__LAN__" not in html and "cantinaRadarShipTpl" in html
     assert (site / "ingest.html").exists()
 
 

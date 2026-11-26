@@ -89,10 +89,13 @@ Al primo avvio si apre la pagina `http://localhost:8000/installa.html`. Trascina
 ### 6. Usalo
 1. Su catawiki.com apri le aste di vino. Il modo migliore è la categoria **Vino** con il filtro *"Chiude oggi"*.
 2. Premi **🍷 Cantina Radar** nei preferiti.
-3. In basso a destra compare un pannello che legge la pagina corrente e le 3 successive (circa 100 lotti; cambia il numero con `browser.pagine` in `config.yaml`). Poi si apre Cantina Radar con i risultati. Se il browser blocca la finestra, premi **Apri i risultati →** nel pannello. Le occasioni sopra soglia ti arrivano anche su Telegram.
+3. In basso a destra compare un pannello che legge la pagina corrente e **tutte le successive dell'elenco** (fino a 30 pagine, `browser.pagine` in `config.yaml`): una pressione nel tardo pomeriggio copre tutte le chiusure della giornata. Poi si apre Cantina Radar con i risultati. Se il browser blocca la finestra, premi **Apri i risultati →** nel pannello. Le occasioni sopra soglia ti arrivano anche su Telegram.
 4. Ripeti quando vuoi aggiornare le offerte, per esempio nell'ultima ora prima della chiusura. Ogni pressione registra anche i **prezzi finali** delle aste già chiuse che avevi visto: così lo storico si arricchisce da solo.
 
-La dashboard si apre anche dal telefono, sulla stessa Wi-Fi: lo script mostra l'indirizzo `http://192.168.x.x:8000/`.
+Puoi premere il pulsante **tutte le volte che vuoi**: ogni pressione aggiorna le offerte (utile nell'ultima ora prima delle chiusure), mentre gli avvisi Telegram non si ripetono per lo stesso lotto e la spedizione di un lotto si legge una sola volta.
+
+### Dal telefono
+Con il Mac acceso e l'app aperta, sul telefono (stessa Wi-Fi) apri l'indirizzo che lo script mostra alla voce *Pulsante sul telefono* (es. `http://MacBook-di-Massimo.local:8000/installa.html`) e segui le istruzioni: tocchi **Copia il codice** e crei un preferito con quel codice. Da lì in poi, su Catawiki dal telefono, tocchi il preferito e ricevi i risultati e gli avvisi Telegram. La prima volta il Mac può chiedere se consentire le connessioni in entrata a Python: rispondi **Consenti**. La spedizione va "insegnata" una volta anche sul telefono (vedi sotto).
 
 ### E GitHub?
 Il repository resta il posto dove si trova il codice: ogni aggiornamento lo trovi lì. L'esecuzione automatica su GitHub Actions è disattivata perché Catawiki la blocca.

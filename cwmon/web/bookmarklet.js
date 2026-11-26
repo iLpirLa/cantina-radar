@@ -77,6 +77,34 @@
     while ((m = JK.exec(html)) && js.length < 10) js.push(html.substr(m.index, 320));
     return { s: out, j: js };
   }
+  function compactShipping(txt) {
+    try {
+      var j = JSON.parse(txt), sh = j && j.shipping;
+      if (sh && Array.isArray(sh.rates)) {
+        return JSON.stringify({ shipping: {
+          rates: sh.rates.filter(function (r) { return /^(it|es)$/i.test(r.region_code || ""); })
+            .map(function (r) { return { region_code: r.region_code, price: r.price, currency_code: r.currency_code }; }),
+          destination_country: sh.destination_country ? { country: { short_code: ((sh.destination_country.country || {}).short_code) },
+            shipping: sh.destination_country.shipping } : null,
+          is_pickup_only: !!sh.is_pickup_only } });
+      }
+    } catch (e) {}
+    return txt.slice(0, 4000);
+  }
+  // solo i campi delle offerte live che servono all'app
+  function compactLive(it) {
+    var o = {};
+    Object.keys(it || {}).forEach(function (k) {
+      if (/^(id|lot_?id|lotId|bid|current_?bid\w*|currentBid|bidding_end_time|biddingEndTime|close\w*|end\w*|reserve\w*|winner_token|winnerToken|sold|is_sold|isSold|status|state|liveLot)$/i.test(k)) {
+        var v = it[k];
+        if (v && typeof v === "object" && !Array.isArray(v) && ("EUR" in v)) v = { EUR: v.EUR };
+        if (k === "winner_token" || k === "winnerToken") v = v ? "1" : null;
+        if (k === "liveLot") v = compactLive(v);
+        o[k] = v;
+      }
+    });
+    return o;
+  }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function loadSeen() { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; } }
   function saveSeen(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
@@ -118,7 +146,7 @@
         var r2 = await fetch("/buyer/api/v1/lots/live?ids=" + ids.slice(j, j + 40).join(","),
                              { credentials: "include", headers: { Accept: "application/json" } });
         liveStatus = r2.status;
-        if (r2.ok) { var js = await r2.json(); live = live.concat((js && js.lots) || []); }
+        if (r2.ok) { var js = await r2.json(); live = live.concat(((js && js.lots) || []).map(compactLive)); }
       } catch (e) { liveStatus = String(e); }
     }
     var withLive = {};
@@ -157,7 +185,7 @@
       for (var v = 0; v < variants.length; v++) {
         try {
           var rs = await fetch(variants[v].u, { credentials: "include", headers: { Accept: "application/json" } });
-          if (rs.ok) outv.push({ c: variants[v].c, b: (await rs.text()).slice(0, 6000) });
+          if (rs.ok) outv.push({ c: variants[v].c, b: compactShipping(await rs.text()) });
         } catch (e) {}
       }
       return outv;
@@ -177,15 +205,19 @@
     for (var k = 0; k < todo.length; k++) {
       say("Spedizione e commissione: lotto " + (k + 1) + " di " + todo.length + "…");
       try {
-        var r3 = await fetch("/" + loc + "/l/" + todo[k], { credentials: "include" });
-        if (r3.ok) {
-          var h3 = await r3.text();
-          det[todo[k]] = snippets(h3, new DOMParser().parseFromString(h3, "text/html"));
-          det[todo[k]].k = await shipping(todo[k]);
-          done[todo[k]] = tpl ? now : now - 4 * 86400;  // senza modo di leggere la spedizione: riprova presto
+        if (tpl) {
+          var kk = await shipping(todo[k]);
+          if (kk.length) { det[todo[k]] = { k: kk }; done[todo[k]] = now; }
+        } else {
+          var r3 = await fetch("/" + loc + "/l/" + todo[k], { credentials: "include" });
+          if (r3.ok) {
+            var h3 = await r3.text();
+            det[todo[k]] = snippets(h3, new DOMParser().parseFromString(h3, "text/html"));
+            done[todo[k]] = now - 4 * 86400;  // senza modo di leggere la spedizione: riprova presto
+          }
         }
       } catch (e) {}
-      await sleep(1000);
+      await sleep(tpl ? 700 : 1000);
     }
     try { localStorage.setItem(DKEY, JSON.stringify(done)); } catch (e) {}
     var res = single ? resAll.filter(function (u) { return /\/api\/|graphql/i.test(u); }).slice(0, 60) : [];

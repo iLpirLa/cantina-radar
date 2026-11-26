@@ -231,6 +231,10 @@ function sortRows(rows) {
     bid: (a, b) => (a.bid || 0) - (b.bid || 0) };
   return rows.sort(by[ui.sort]);
 }
+function vivinoSearchUrl(l, withVintage = true) {
+  const name = String([l.pr, l.cu].filter(Boolean).join(" ") || l.t || "").replace(/"/g, "");
+  return `https://www.vivino.com/search/wines?q=${encodeURIComponent(name + (withVintage && l.v ? " " + l.v : ""))}`;
+}
 function searchLinks(l) {
   const name = String([l.pr, l.cu].filter(Boolean).join(" ") || l.t || "");
   const ws = `https://www.wine-searcher.com/find/${encodeURIComponent(name.toLowerCase()).replace(/%20/g, "+")}${l.v ? "/" + l.v : ""}`;
@@ -284,7 +288,8 @@ function lotCard(l) {
     l.v ? `<span class="chip">${l.v}</span>` : "",
     l.bt ? `<span class="chip">${l.bt} ${l.bt === 1 ? "bottiglia" : "bottiglie"}${l.eq && l.eq !== l.bt ? ` (= ${String(l.eq).replace(".", ",")} da 0,75 L)` : ""}</span>` : "",
     l.ty ? `<span class="chip">${esc((DATA.wine_types || {})[l.ty] || l.ty)}</span>` : (l.cat && SPIRITS.has(l.cat) ? `<span class="chip">${esc(l.cat)}</span>` : ""),
-    l.rt ? `<a class="chip star" href="${esc(l.ru || "#")}" target="_blank" rel="noopener" title="Valutazione media degli utenti Vivino">★ ${Number(l.rt).toFixed(1).replace(".", ",")} Vivino${l.rc ? ` · ${Number(l.rc).toLocaleString("it-IT")} voti` : ""}</a>` : "",
+    l.rt ? `<a class="chip star" href="${esc(l.ru || vivinoSearchUrl(l))}" target="_blank" rel="noopener" title="Valutazione media degli utenti Vivino: apri la scheda">★ ${Number(l.rt).toFixed(1).replace(".", ",")} Vivino${l.rc ? ` · ${Number(l.rc).toLocaleString("it-IT")} voti` : ""} ↗</a>`
+      : (l.pr && !SPIRITS.has(l.cat)) ? `<a class="chip" href="${esc(vivinoSearchUrl(l, !l.mix))}" target="_blank" rel="noopener" title="Punteggio non ancora disponibile: cerca il vino su Vivino">Vivino ↗</a>` : "",
     l.cs ? `<span class="chip critic" title="Punteggio della critica inserito da te">✎ ${esc(l.cs)}</span>` : "",
     l.mix ? `<span class="chip warn">lotto misto</span>` : "",
     l.po ? `<span class="chip warn" title="Il venditore non spedisce: il lotto va ritirato di persona">solo ritiro</span>` : "",

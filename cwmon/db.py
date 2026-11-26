@@ -106,6 +106,9 @@ class DB:
         self._migrate()
 
     def _migrate(self) -> None:
+        vcols = {r[1] for r in self.conn.execute("PRAGMA table_info(vivino)")}
+        if "wine_name" not in vcols:
+            self.conn.execute("ALTER TABLE vivino ADD COLUMN wine_name TEXT")
         cols = {r[1] for r in self.conn.execute("PRAGMA table_info(lots)")}
         for name, typ in (("rating", "REAL"), ("rating_count", "INTEGER"), ("rating_url", "TEXT"),
                           ("critic_score", "TEXT"), ("ship_it", "REAL"), ("ship_es", "REAL"), ("ship_any", "REAL"),

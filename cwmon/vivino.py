@@ -189,20 +189,28 @@ def enrich(cfg: dict, db, limit: int | None = None) -> int:
     limit = limit or int(cfg.get("vivino", {}).get("ricerche", PER_RUN))
     rows = db.conn.execute(
         "SELECT l.* FROM lots l LEFT JOIN vivino v ON v.wine_key=l.wine_key AND v.vintage IS l.vintage "
-        "WHERE l.final=0 AND l.parse_ok=1 AND l.wine_key!='' AND COALESCE(l.category_id,443) NOT IN (437,965) "
+        "WHERE l.final=0 AND l.mixed=0 AND COALESCE(l.producer,'')!='' AND l.wine_key!='' "
+        "AND COALESCE(l.category_id,443) NOT IN (437,965) "
         "AND l.end_time IS NOT NULL AND l.end_time BETWEEN ? AND ? "
         "AND (v.wine_key IS NULL OR (v.rating IS NULL AND v.fetched_at < ?) OR v.fetched_at < ?) "
         "ORDER BY l.end_time LIMIT ?",
-        (now, now + 48 * 3600, now - MISS_DAYS * 86400, now - CACHE_DAYS * 86400, limit)).fetchall()
+        (now, now + 48 * 3600, now - MISS_DAYS * 86400, now - CACHE_DAYS * 86400, limit * 6)).fetchall()
     if not rows:
         return 0
     viv = Vivino(max(4.0, float(cfg.get("vivino", {}).get("pausa", 4.0))))
     done, seen = 0, set()
+    known = [dict(r) for r in db.conn.execute(
+        "SELECT wine_name, vintage, rating FROM vivino WHERE wine_name IS NOT NULL AND rating IS NOT NULL")]
     for lot in rows:
+        if done >= limit:
+            break
         k = (lot["wine_key"], lot["vintage"])
         if k in seen:
             continue
         seen.add(k)
+        # stesso vino e annata già trovato con un titolo scritto diversamente (es. altro formato o altro venditore)
+        if any(kn["vintage"] == lot["vintage"] and similarity(lot["wine_name"] or "", kn["wine_name"]) >= 90 for kn in known):
+            continue
         q = build_query(lot)
         if lot["vintage"]:
             q = f"{q} {lot['vintage']}"
@@ -220,10 +228,12 @@ def enrich(cfg: dict, db, limit: int | None = None) -> int:
         h = best_match(lot, hits)
         db.conn.execute(
             "INSERT OR REPLACE INTO vivino(wine_key, vintage, query, name, year, rating, rating_count, price, "
-            "currency, url, fetched_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            "currency, url, fetched_at, wine_name) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             (lot["wine_key"], lot["vintage"], q, h.name if h else None, h.year if h else None,
              h.rating if h else None, h.count if h else None, h.price if h else None,
-             h.currency if h else None, h.url if h else None, int(time.time())))
+             h.currency if h else None, h.url if h else None, int(time.time()), lot["wine_name"] or ""))
+        if h and h.rating:
+            known.append({"wine_name": lot["wine_name"] or "", "vintage": lot["vintage"], "rating": h.rating})
         db.commit()
         done += 1
         time.sleep(viv.delay)

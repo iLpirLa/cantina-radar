@@ -500,3 +500,15 @@ def test_mixed_lots_never_inherit_manual_values(tmp_path):
     db.commit()
     score_all(cfg, db)
     assert get(3)[0] == 36 and get(2)[0] == 99
+
+
+def test_vivino_rating_shared_across_formats_and_titles():
+    a = _lot(title="2016 Tenuta San Guido, Sassicaia - Bolgheri - 1 Bottiglia (0,75 L)", id=1, mixed=0)
+    b = _lot(title="2016 Tenuta San Guido - Sassicaia - Bolgheri - 1 Magnum (1,5 L)", id=2, mixed=0)
+    c = _lot(title="2016 Tenuta San Guido, Sassicaia - Bolgheri - 6 Bottiglie (0,75 L)", id=3, mixed=0)
+    d = _lot(title="2015 Tenuta San Guido, Sassicaia - Bolgheri - 1 Bottiglia (0,75 L)", id=4, mixed=0)
+    viv = {(a["wine_key"], 2016): {"wine_name": a["wine_name"], "vintage": 2016, "rating": 4.7, "rating_count": 6658,
+                                   "url": "https://www.vivino.com/x", "price": None, "currency": None, "year": 2016}}
+    v = Valuator([], [], COSTS, vivino=viv)
+    assert v.quality(b)["rating"] == 4.7 and v.quality(c)["rating"] == 4.7   # magnum e pack: stesso punteggio
+    assert "rating" not in v.quality(d)                                       # annata diversa: no

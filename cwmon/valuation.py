@@ -90,6 +90,7 @@ class Valuator:
                  vivino: dict | None = None, manual: list | None = None):
         self.refs = refs
         self.vivino = vivino or {}
+        self._viv_named = [v for v in self.vivino.values() if v.get("wine_name") and v.get("rating")]
         self.manual = [dict(m) for m in (manual or [])]
         self._manual_key = {(m["wine_key"], m["vintage"]): m for m in self.manual}
         self._manual_lot = {m["lot_id"]: m for m in self.manual if m.get("lot_id")}
@@ -155,7 +156,7 @@ class Valuator:
         return best
 
     def _from_vivino(self, lot) -> dict | None:
-        v = self.vivino.get((lot["wine_key"], lot["vintage"]))
+        v = self.vivino_for(lot)
         if not v or not v.get("price") or v.get("currency") != "EUR":
             return None
         if lot["vintage"] and v.get("year") and v["year"] != lot["vintage"]:
@@ -249,9 +250,27 @@ class Valuator:
             conf = min(0.95, conf + 0.05) if spread <= 0.25 else conf * (0.8 if spread > 0.5 else 0.95)
         return {"value": value, "conf": round(conf, 2), "src": " + ".join(s["src"] for s in sources)}
 
+    def vivino_for(self, lot) -> dict | None:
+        v = self.vivino.get((lot["wine_key"], lot["vintage"]))
+        if v and v.get("rating"):
+            return v
+        try:
+            if lot["mixed"]:
+                return None
+        except (IndexError, KeyError):
+            pass
+        best, best_s = None, 0.0
+        for c in self._viv_named:
+            if c.get("vintage") != lot["vintage"]:
+                continue
+            s = similarity(lot["wine_name"] or "", c["wine_name"])
+            if s >= 90 and s > best_s:
+                best, best_s = c, s
+        return best or v
+
     def quality(self, lot) -> dict:
         out = {}
-        v = self.vivino.get((lot["wine_key"], lot["vintage"]))
+        v = self.vivino_for(lot)
         if v and v.get("rating"):
             out.update(rating=v["rating"], rating_count=v.get("rating_count"), rating_url=v.get("url"))
         m = self.manual_for(lot)

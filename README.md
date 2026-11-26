@@ -94,8 +94,6 @@ Al primo avvio si apre la pagina `http://localhost:8000/installa.html`. Trascina
 
 Puoi premere il pulsante **tutte le volte che vuoi**: ogni pressione aggiorna le offerte (utile nell'ultima ora prima delle chiusure), mentre gli avvisi Telegram non si ripetono per lo stesso lotto e la spedizione di un lotto si legge una sola volta.
 
-### Dal telefono
-Con il Mac acceso e l'app aperta, sul telefono (stessa Wi-Fi) apri l'indirizzo che lo script mostra alla voce *Pulsante sul telefono* (es. `http://MacBook-di-Massimo.local:8000/installa.html`) e segui le istruzioni: tocchi **Copia il codice** e crei un preferito con quel codice. Da lì in poi, su Catawiki dal telefono, tocchi il preferito e ricevi i risultati e gli avvisi Telegram. La prima volta il Mac può chiedere se consentire le connessioni in entrata a Python: rispondi **Consenti**. La spedizione va "insegnata" una volta anche sul telefono (vedi sotto).
 
 ### E GitHub?
 Il repository resta il posto dove si trova il codice: ogni aggiornamento lo trovi lì. L'esecuzione automatica su GitHub Actions è disattivata perché Catawiki la blocca.

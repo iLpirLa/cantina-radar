@@ -9,94 +9,46 @@
   .mute{color:#a8978b}
   .bm{display:inline-block;margin:14px 0;padding:12px 22px;border-radius:999px;background:#8e1b3a;border:1px solid #b8325a;
       color:#fff;text-decoration:none;font-weight:600;cursor:grab;font-size:16px}
-  .btn{display:inline-block;padding:10px 18px;border-radius:999px;background:#8e1b3a;border:1px solid #b8325a;color:#fff;font:inherit;font-weight:600;cursor:pointer}
   ol li{margin:6px 0} code{background:#271e1a;padding:2px 6px;border-radius:5px}
   textarea{width:100%;height:80px;background:#1f1815;color:#a8978b;border:1px solid #3a2d27;border-radius:8px;font:12px monospace}
-  .box{background:#1f1815;border:1px solid #3a2d27;border-radius:12px;padding:12px 16px;margin:12px 0}
-  .ok{color:#62c48f}
   a{color:#d6b26e}
-  [hidden]{display:none!important}
 </style></head>
 <body><main>
   <h1>Cantina <span>Radar</span></h1>
-  <p class="mute" id="where"></p>
+  <p class="mute">Installa il pulsante nella barra dei preferiti: si fa una volta sola.</p>
 
-  <!-- ===================== Mac / computer ===================== -->
-  <section id="desk">
+  <section>
     <h2>1. Trascina il pulsante nella barra dei preferiti</h2>
     <a class="bm" id="bm" href="#">🍷 Cantina Radar</a>
     <ol>
       <li>Se non vedi la barra dei preferiti: <b>Chrome</b> <code>Cmd+Shift+B</code> (Windows <code>Ctrl+Shift+B</code>), <b>Safari</b> menu Vista → Mostra barra dei Preferiti.</li>
       <li>Tieni premuto il pulsante rosso qui sopra e trascinalo nella barra.</li>
     </ol>
-    <div class="box" id="phoneHint">
-      <b>📱 Vuoi usarlo anche dal telefono?</b><br>
-      <span class="mute">Con il Mac acceso e l'app aperta, apri sul telefono (sulla stessa Wi-Fi) questo indirizzo e segui le istruzioni che trovi lì:</span><br>
-      <code id="phoneUrl"></code>
-    </div>
   </section>
 
-  <!-- ===================== Telefono ===================== -->
-  <section id="mobile" hidden>
-    <h2>1. Copia il codice del pulsante</h2>
-    <button class="btn" id="copyBtn">Copia il codice</button> <span class="ok" id="copied"></span>
-    <p class="mute">Se il tasto non funziona, tieni premuto nel riquadro qui sotto, "Seleziona tutto" e "Copia".</p>
-    <h2>2. Crea il preferito</h2>
-    <p><b>iPhone (Safari)</b></p>
-    <ol>
-      <li>Su questa pagina tocca <b>Condividi</b> (il quadrato con la freccia) → <b>Aggiungi ai preferiti</b> → Salva.</li>
-      <li>Apri i <b>Preferiti</b> (icona del libro) → <b>Modifica</b> → tocca il preferito appena creato.</li>
-      <li>Nel nome scrivi <code>Cantina Radar</code>; nell'indirizzo cancella tutto e <b>incolla</b> il codice copiato. Fine.</li>
-    </ol>
-    <p><b>Android (Chrome)</b></p>
-    <ol>
-      <li>Tocca <b>⋮</b> → la stellina ☆ per salvare questa pagina nei preferiti, poi <b>Modifica</b>.</li>
-      <li>Nel nome scrivi <code>Cantina Radar</code>; nell'URL cancella tutto e <b>incolla</b> il codice copiato. Salva.</li>
-      <li>Per usarlo: su Catawiki tocca la barra degli indirizzi, scrivi <code>Cantina Radar</code> e tocca il preferito che compare nell'elenco.</li>
-    </ol>
-  </section>
-
+  <p class="mute">Non riesci a trascinarlo? Crea un preferito qualsiasi, modificalo e incolla come indirizzo (URL) il testo qui sotto:</p>
   <textarea id="code" readonly onclick="this.select()"></textarea>
 
   <h2>Come si usa</h2>
   <ol>
-    <li>Tieni aperta l'app sul Mac (la finestra nera avviata con <code>avvia-mac.command</code>).</li>
+    <li>Tieni aperta l'app (la finestra nera avviata con <code>avvia-mac.command</code>).</li>
     <li>Su catawiki.com apri la categoria <b>Vino</b> con il filtro <i>"Chiude oggi"</i>.</li>
     <li>Premi <b>🍷 Cantina Radar</b>. Un pannello in basso legge <b>tutte le pagine</b> dell'elenco (fino a __PAGES__) e le offerte aggiornate, poi apre i risultati.
       Se il browser blocca la nuova finestra, tocca <b>Apri i risultati →</b> nel pannello.</li>
     <li>Puoi premerlo <b>tutte le volte che vuoi</b>: ogni pressione aggiorna le offerte (utile nell'ultima ora prima delle chiusure). Gli avvisi Telegram non si ripetono per lo stesso lotto.</li>
   </ol>
-  <h2>Spedizione: insegnala al pulsante (una volta per ogni browser)</h2>
+  <h2>Spedizione: insegnala al pulsante (una volta)</h2>
   <p class="mute">Apri la pagina di <b>un lotto di vino</b>, scorri finché vedi il costo di spedizione e premi <b>🍷 Cantina Radar</b> lì.
-  Da quel momento questo browser legge la spedizione di tutti i lotti (segno ✓ nel conto). Sul telefono va fatto una volta anche lì.</p>
+  Da quel momento questo browser legge la spedizione di tutti i lotti (segno ✓ nel conto).</p>
   <p class="mute">Hai aggiornato Cantina Radar? Sostituisci il vecchio preferito con quello nuovo.</p>
   <p><a href="/">← Torna alla dashboard</a></p>
 </main>
 <script>
   const JS = __BOOKMARKLET_JS__;
-  const HOST = "__HOST__", PORT = location.port || "80";
-  // il pulsante parla con l'app all'indirizzo da cui hai aperto questa pagina
-  const origin = location.origin;
-  const code = "javascript:" + encodeURIComponent(JS.split("__ORIGIN__").join(origin));
-  const isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-  const isPhone = /iphone|ipad|android|mobile/i.test(navigator.userAgent) || !isLocal;
+  const code = "javascript:" + encodeURIComponent(JS.split("__ORIGIN__").join(location.origin));
   document.getElementById("code").value = code;
   const bm = document.getElementById("bm");
   bm.href = code;
   bm.addEventListener("click", e => { e.preventDefault(); alert("Trascinalo nella barra dei preferiti, non cliccarlo qui 🙂"); });
-  document.getElementById("where").textContent = isPhone
-    ? `Installazione sul telefono. Il pulsante invierà i dati all'app sul Mac all'indirizzo ${origin}.`
-    : "Installa il pulsante nella barra dei preferiti: si fa una volta sola.";
-  document.getElementById("desk").hidden = isPhone;
-  document.getElementById("mobile").hidden = !isPhone;
-  const lan = "__LAN__";
-  document.getElementById("phoneUrl").textContent =
-    (HOST ? `http://${HOST}:${PORT}/installa.html  (oppure  ` : "") + (lan ? `http://${lan}:${PORT}/installa.html` : "") + (HOST ? ")" : "");
-  document.getElementById("copyBtn").onclick = async () => {
-    const ta = document.getElementById("code");
-    try { await navigator.clipboard.writeText(code); }
-    catch (e) { ta.focus(); ta.select(); ta.setSelectionRange(0, code.length); document.execCommand("copy"); }
-    document.getElementById("copied").textContent = "✓ Copiato";
-  };
 </script>
 </body></html>

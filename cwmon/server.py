@@ -339,32 +339,6 @@ def pending_ids(db: DB, limit: int = 200) -> list[int]:
     return ids
 
 
-def _lan_ip() -> str:
-    """Indirizzo del computer nella rete di casa (per aprire l'app dal telefono)."""
-    import socket
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except OSError:
-        return ""
-
-
-def _mdns_name() -> str:
-    """Nome del Mac in rete (es. MacBook-di-Massimo.local): non cambia anche se cambia l'indirizzo IP."""
-    import platform
-    import subprocess
-    if platform.system() != "Darwin":
-        return ""
-    try:
-        name = subprocess.run(["scutil", "--get", "LocalHostName"], capture_output=True, text=True, timeout=3).stdout.strip()
-        return f"{name}.local" if name else ""
-    except (OSError, subprocess.SubprocessError):
-        return ""
-
-
 def write_static(cfg: dict, port: int) -> Path:
     """Genera ingest.html e installa.html (col pulsante già configurato) nella cartella della dashboard."""
     site = Path(cfg["_root"]) / cfg["dashboard"]["cartella"]
@@ -374,11 +348,9 @@ def write_static(cfg: dict, port: int) -> Path:
     js = "\n".join(l for l in js.splitlines() if not l.strip().startswith("//"))
     details = int(cfg.get("browser", {}).get("dettagli", 60))
     js = js.replace("__PAGES__", str(pages)).replace("__DETAILS__", str(details))
-    # l'indirizzo dell'app (__ORIGIN__) lo inserisce la pagina di installazione: localhost sul Mac,
-    # l'indirizzo di rete del Mac se la apri dal telefono
+    # l'indirizzo dell'app (__ORIGIN__) lo inserisce la pagina di installazione (http://localhost:<porta>)
     inst = (WEB / "installa.html").read_text(encoding="utf-8")
-    inst = (inst.replace("__BOOKMARKLET_JS__", json.dumps(js).replace("</", "<\\/")).replace("__PAGES__", str(pages))
-            .replace("__HOST__", _mdns_name()).replace("__LAN__", _lan_ip()))
+    inst = inst.replace("__BOOKMARKLET_JS__", json.dumps(js).replace("</", "<\\/")).replace("__PAGES__", str(pages))
     (site / "installa.html").write_text(inst, encoding="utf-8")
     (site / "ingest.html").write_text((WEB / "ingest.html").read_text(encoding="utf-8"), encoding="utf-8")
     return site

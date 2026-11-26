@@ -109,7 +109,7 @@
   .seg button{background:var(--panel);border:0;padding:7px 13px;cursor:pointer;color:var(--mute);font-size:13px}
   .seg button.on{background:var(--wine);color:#fff}
   .bars{display:flex;flex-direction:column;gap:2px;margin-top:6px}
-  .bar{display:grid;grid-template-columns:170px 1fr 150px;align-items:center;gap:12px;padding:9px 10px;border-radius:10px;cursor:pointer;
+  .bar{display:grid;grid-template-columns:170px 1fr 190px;align-items:center;gap:12px;padding:9px 10px;border-radius:10px;cursor:pointer;
        background:none;border:0;text-align:left;width:100%;color:var(--ink)}
   .bar:hover,.bar:focus-visible{background:var(--panel2);outline:none}
   .bar .name{font-size:14px}
@@ -118,7 +118,7 @@
   .bar:hover .fill{background:#e8c784}
   .bar .val{text-align:right;font-variant-numeric:tabular-nums;font-size:14px}
   .bar .val small{color:var(--faint);margin-left:6px}
-  .axis{display:grid;grid-template-columns:170px 1fr 150px;gap:12px;padding:0 10px;color:var(--faint);font-size:11px}
+  .axis{display:grid;grid-template-columns:170px 1fr 190px;gap:12px;padding:0 10px;color:var(--faint);font-size:11px}
   .axis .ticks{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:4px}
   .ctip{position:fixed;pointer-events:none;background:#0f0b0a;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13px;
         z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.45);min-width:200px}
@@ -446,7 +446,7 @@ function render() {
   else renderHelp();
 }
 
-const sui = { metric: "n" };
+const sui = { metric: "bids" };
 function lotMarket(l) { return l.mv != null && l.eq ? l.mv * l.eq : null; }  // valore di mercato del lotto intero
 function renderSummary() {
   const TY = DATA.wine_types || {};
@@ -463,9 +463,9 @@ function renderSummary() {
   const tot = { n: L.length, bids: L.reduce((a, l) => a + (Number(l.bid) || 0), 0),
                 mkt: L.reduce((a, l) => a + (lotMarket(l) || 0), 0), nMkt: L.filter(l => lotMarket(l) != null).length,
                 bottles: L.reduce((a, l) => a + (Number(l.bt) || 0), 0) };
-  const M = { n: { t: "Numero di lotti", f: g => g.n, fmt: v => v.toLocaleString("it-IT") },
-              bids: { t: "Valore delle offerte attuali", f: g => g.bids, fmt: eur },
-              mkt: { t: "Valore di mercato stimato", f: g => g.mkt, fmt: eur } };
+  const M = { bids: { t: "Valore delle offerte attuali", f: g => g.bids, fmt: eur },
+              mkt: { t: "Valore di mercato stimato", f: g => g.mkt, fmt: eur },
+              n: { t: "Numero di lotti", f: g => g.n, fmt: v => v.toLocaleString("it-IT") } };
   const m = M[sui.metric];
   const G = Object.values(groups).sort((a, b) => m.f(b) - m.f(a) || b.n - a.n);
   const max = Math.max(1, ...G.map(m.f));
@@ -485,7 +485,7 @@ function renderSummary() {
         <h3 style="margin:0">Tipologie nelle aste aperte · ${m.t.toLowerCase()}</h3>
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
           <div class="seg" role="group" aria-label="Misura">${Object.entries(M).map(([k, x]) =>
-            `<button data-m="${k}" class="${k === sui.metric ? "on" : ""}">${k === "n" ? "Lotti" : k === "bids" ? "Offerte €" : "Valore di mercato €"}</button>`).join("")}</div>
+            `<button data-m="${k}" class="${k === sui.metric ? "on" : ""}">${k === "n" ? "Numero di lotti" : k === "bids" ? "Valore offerte €" : "Valore di mercato €"}</button>`).join("")}</div>
           <label class="toggle"><input type="checkbox" id="sNoSpirits" ${ui.noSpirits ? "checked" : ""}> Nascondi distillati</label>
         </div>
       </div>
@@ -495,7 +495,7 @@ function renderSummary() {
         return `<button class="bar" data-k="${g.k}" aria-label="${esc(label(g.k))}: ${m.fmt(v)}">
           <span class="name">${esc(label(g.k))}</span>
           <span class="track"><span class="fill" style="width:${w}%"></span></span>
-          <span class="val">${m.fmt(v)}<small>${Math.round(100 * v / totM)}%</small></span></button>`;
+          <span class="val">${m.fmt(v)}<small>${sui.metric === "n" ? eur(g.bids) : `${g.n} ${g.n === 1 ? "lotto" : "lotti"}`}</small></span></button>`;
       }).join("")}</div>
       <div class="axis"><span></span><span class="ticks">${ticks.map(t => `<span>${m.fmt(t)}</span>`).join("")}</span><span></span></div>`
       : `<div class="empty">Nessuna asta aperta. Premi il pulsante su Catawiki per leggere i lotti.</div>`}
@@ -508,8 +508,8 @@ function renderSummary() {
     b.onmousemove = e => {
       tip.hidden = false;
       tip.innerHTML = `<b>${esc(label(g.k))}</b>
+        <div class="r"><span>Valore offerte attuali</span><span>${eur(g.bids)} (${Math.round(100 * g.bids / Math.max(1, tot.bids))}%)</span></div>
         <div class="r"><span>Lotti</span><span>${g.n} (${Math.round(100 * g.n / Math.max(1, tot.n))}%)</span></div>
-        <div class="r"><span>Offerte attuali</span><span>${eur(g.bids)}</span></div>
         <div class="r"><span>Valore di mercato stimato</span><span>${g.nMkt ? eur(g.mkt) + ` (${g.nMkt} lotti)` : "–"}</span></div>
         <div class="r"><span>Occasioni</span><span>${g.deals}</span></div>`;
       const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 10), y = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 10);

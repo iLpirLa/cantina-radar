@@ -100,6 +100,31 @@
   dl{display:grid;grid-template-columns:200px 1fr;gap:10px 18px;margin:0}
   dt{font-weight:600} dd{margin:0;color:var(--mute)}
   footer{color:var(--faint);font-size:12px;padding:24px 0 40px}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}
+  .tile{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .tile .l{color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.07em}
+  .tile .v{font:600 28px/1.15 var(--serif);margin-top:4px;font-variant-numeric:tabular-nums}
+  .tile .s{color:var(--faint);font-size:12px;margin-top:2px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .seg button{background:var(--panel);border:0;padding:7px 13px;cursor:pointer;color:var(--mute);font-size:13px}
+  .seg button.on{background:var(--wine);color:#fff}
+  .bars{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+  .bar{display:grid;grid-template-columns:170px 1fr 150px;align-items:center;gap:12px;padding:9px 10px;border-radius:10px;cursor:pointer;
+       background:none;border:0;text-align:left;width:100%;color:var(--ink)}
+  .bar:hover,.bar:focus-visible{background:var(--panel2);outline:none}
+  .bar .name{font-size:14px}
+  .bar .track{height:14px;position:relative}
+  .bar .fill{position:absolute;left:0;top:0;bottom:0;background:var(--gold);border-radius:0 4px 4px 0;min-width:2px}
+  .bar:hover .fill{background:#e8c784}
+  .bar .val{text-align:right;font-variant-numeric:tabular-nums;font-size:14px}
+  .bar .val small{color:var(--faint);margin-left:6px}
+  .axis{display:grid;grid-template-columns:170px 1fr 150px;gap:12px;padding:0 10px;color:var(--faint);font-size:11px}
+  .axis .ticks{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:4px}
+  .ctip{position:fixed;pointer-events:none;background:#0f0b0a;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13px;
+        z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.45);min-width:200px}
+  .ctip b{display:block;margin-bottom:4px} .ctip .r{display:flex;justify-content:space-between;gap:14px;color:var(--mute)}
+  .ctip .r span:last-child{color:var(--ink);font-variant-numeric:tabular-nums}
+  @media (max-width:860px){ .bar,.axis{grid-template-columns:110px 1fr 96px} .bar .val small{display:none} }
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f3a2b;border:1px solid #3f6650;color:#d9f5e4;
          padding:12px 18px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.4);z-index:50;max-width:92vw;font-size:14px}
   .banner{background:#2b2015;border:1px solid #5b4528;color:#f0cf9a;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:14px}
@@ -148,6 +173,7 @@
 
 <nav class="tabs" id="tabs">
   <button data-t="deals">🔥 Occasioni<span class="n" id="nDeals"></span></button>
+  <button data-t="sum">📊 Riepilogo</button>
   <button data-t="all">Tutti i lotti<span class="n" id="nAll"></span></button>
   <button data-t="todo">Da valutare<span class="n" id="nTodo"></span></button>
   <button data-t="hist">Storico vendite<span class="n" id="nHist"></span></button>
@@ -396,6 +422,7 @@ function renderList(rows, empty, hint, extra) {
 }
 
 function render() {
+  document.querySelectorAll(".ctip").forEach(t => t.remove());
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
   counts();
   const s = S(), rateTxt = s.punteggio_minimo ? `, Vivino ≥ ${fmtRate(s.punteggio_minimo)}` : "";
@@ -414,10 +441,90 @@ function render() {
     renderList(() => DATA.lots.filter(l => isOpen(l) && l.d == null && !l.mix),
       "Tutti i lotti hanno già un valore di mercato. 👍",
       "Per questi vini l'app non conosce ancora il valore di mercato. Inserisci il prezzo a bottiglia (da Wine-Searcher, Vivino o dalla tua enoteca): resta salvato e vale anche per le aste future dello stesso vino e annata.");
-  } else if (tab === "hist") renderHistory();
+  } else if (tab === "sum") renderSummary();
+  else if (tab === "hist") renderHistory();
   else renderHelp();
 }
 
+const sui = { metric: "n" };
+function lotMarket(l) { return l.mv != null && l.eq ? l.mv * l.eq : null; }  // valore di mercato del lotto intero
+function renderSummary() {
+  const TY = DATA.wine_types || {};
+  const L = DATA.lots.filter(l => isOpen(l) && !(ui.noSpirits && SPIRITS.has(l.cat)));
+  const groups = {};
+  L.forEach(l => {
+    const k = SPIRITS.has(l.cat) ? "__spirits" : (l.ty || "");
+    const g = groups[k] || (groups[k] = { k, n: 0, bids: 0, mkt: 0, nMkt: 0, deals: 0 });
+    g.n++; g.bids += Number(l.bid) || 0;
+    const m = lotMarket(l); if (m != null) { g.mkt += m; g.nMkt++; }
+    if (isDeal(l)) g.deals++;
+  });
+  const label = k => k === "__spirits" ? "Distillati" : (TY[k] || "Non determinato");
+  const tot = { n: L.length, bids: L.reduce((a, l) => a + (Number(l.bid) || 0), 0),
+                mkt: L.reduce((a, l) => a + (lotMarket(l) || 0), 0), nMkt: L.filter(l => lotMarket(l) != null).length,
+                bottles: L.reduce((a, l) => a + (Number(l.bt) || 0), 0) };
+  const M = { n: { t: "Numero di lotti", f: g => g.n, fmt: v => v.toLocaleString("it-IT") },
+              bids: { t: "Valore delle offerte attuali", f: g => g.bids, fmt: eur },
+              mkt: { t: "Valore di mercato stimato", f: g => g.mkt, fmt: eur } };
+  const m = M[sui.metric];
+  const G = Object.values(groups).sort((a, b) => m.f(b) - m.f(a) || b.n - a.n);
+  const max = Math.max(1, ...G.map(m.f));
+  const totM = G.reduce((a, g) => a + m.f(g), 0) || 1;
+  const nice = v => { const p = Math.pow(10, Math.floor(Math.log10(v))); const r = v / p;
+    return ([1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(x => r <= x)) * p; };
+  const top = nice(max), ticks = [0, top / 2, top];
+  $("#view").innerHTML = `
+    <div class="tiles">
+      <div class="tile"><div class="l">Aste aperte</div><div class="v">${tot.n.toLocaleString("it-IT")}</div><div class="s">${tot.bottles.toLocaleString("it-IT")} bottiglie in totale</div></div>
+      <div class="tile"><div class="l">Valore offerte attuali</div><div class="v">${eur(tot.bids)}</div><div class="s">somma delle offerte su tutti i lotti aperti</div></div>
+      <div class="tile"><div class="l">Valore di mercato stimato</div><div class="v">${eur(tot.mkt)}</div><div class="s">sui ${tot.nMkt} lotti con valore noto (${Math.round(100 * tot.nMkt / Math.max(1, tot.n))}%)</div></div>
+      <div class="tile"><div class="l">Occasioni</div><div class="v">${L.filter(isDeal).length}</div><div class="s">secondo il tuo obiettivo (sconto ≥ ${goalPct()}%)</div></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <h3 style="margin:0">Tipologie nelle aste aperte · ${m.t.toLowerCase()}</h3>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="seg" role="group" aria-label="Misura">${Object.entries(M).map(([k, x]) =>
+            `<button data-m="${k}" class="${k === sui.metric ? "on" : ""}">${k === "n" ? "Lotti" : k === "bids" ? "Offerte €" : "Valore di mercato €"}</button>`).join("")}</div>
+          <label class="toggle"><input type="checkbox" id="sNoSpirits" ${ui.noSpirits ? "checked" : ""}> Nascondi distillati</label>
+        </div>
+      </div>
+      <p class="hint" style="margin:8px 0 4px">Clicca una barra per vedere i lotti di quella tipologia.${sui.metric === "mkt" ? " Il valore di mercato è sommato solo sui lotti per cui è noto." : ""}</p>
+      ${G.length ? `<div class="bars">${G.map(g => {
+        const v = m.f(g), w = Math.max(0.4, 100 * v / top);
+        return `<button class="bar" data-k="${g.k}" aria-label="${esc(label(g.k))}: ${m.fmt(v)}">
+          <span class="name">${esc(label(g.k))}</span>
+          <span class="track"><span class="fill" style="width:${w}%"></span></span>
+          <span class="val">${m.fmt(v)}<small>${Math.round(100 * v / totM)}%</small></span></button>`;
+      }).join("")}</div>
+      <div class="axis"><span></span><span class="ticks">${ticks.map(t => `<span>${m.fmt(t)}</span>`).join("")}</span><span></span></div>`
+      : `<div class="empty">Nessuna asta aperta. Premi il pulsante su Catawiki per leggere i lotti.</div>`}
+    </div>`;
+  document.querySelectorAll(".seg button").forEach(b => b.onclick = () => { sui.metric = b.dataset.m; renderSummary(); });
+  $("#sNoSpirits").onchange = e => { ui.noSpirits = e.target.checked; renderSummary(); counts(); };
+  const tip = document.createElement("div"); tip.className = "ctip"; tip.hidden = true; document.body.appendChild(tip);
+  document.querySelectorAll(".bar").forEach(b => {
+    const g = groups[b.dataset.k];
+    b.onmousemove = e => {
+      tip.hidden = false;
+      tip.innerHTML = `<b>${esc(label(g.k))}</b>
+        <div class="r"><span>Lotti</span><span>${g.n} (${Math.round(100 * g.n / Math.max(1, tot.n))}%)</span></div>
+        <div class="r"><span>Offerte attuali</span><span>${eur(g.bids)}</span></div>
+        <div class="r"><span>Valore di mercato stimato</span><span>${g.nMkt ? eur(g.mkt) + ` (${g.nMkt} lotti)` : "–"}</span></div>
+        <div class="r"><span>Occasioni</span><span>${g.deals}</span></div>`;
+      const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 10), y = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 10);
+      tip.style.left = x + "px"; tip.style.top = y + "px";
+    };
+    b.onmouseleave = () => tip.hidden = true;
+    b.onclick = () => {
+      tip.remove();
+      if (b.dataset.k === "__spirits") { ui.noSpirits = false; ui.type = ""; ui.q = ""; }
+      else ui.type = b.dataset.k || "nd";
+      tab = "all"; history.replaceState(null, "", "?tab=all"); render();
+      window.scrollTo({ top: document.getElementById("tabs").offsetTop - 10, behavior: "smooth" });
+    };
+  });
+}
 const hui = { q: "", prod: "", type: "", yFrom: "", yTo: "", dFrom: "", dTo: "", pMin: "", pMax: "", basis: "lot", sort: "recent", noSpirits: true };
 function histFiltered() {
   const dFrom = hui.dFrom ? new Date(hui.dFrom + "T00:00:00").getTime() / 1000 : null;
@@ -612,6 +719,7 @@ async function reload() {
   } catch (e) {}
   header(); fillGoal();
   if (tab === "hist") { counts(); if (document.getElementById("hTable")) histTable(); }
+  else if (tab === "sum") { counts(); renderSummary(); }
   else if (tab === "help") counts(); else render();
 }
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
